@@ -1,0 +1,6 @@
+build/
+game/.godot/
+*.keystore
+!debug.keystore
+local.env
+.DS_Store
