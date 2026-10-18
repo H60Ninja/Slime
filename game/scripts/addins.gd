@@ -9,6 +9,12 @@ var slime: Node2D   # set by Slime
 var _items: Array = []  # {p: Vector2 (grid), kind: int, col: Color, rot: float, size: float}
 
 
+func transpose() -> void:
+	for it in _items:
+		it["p"] = Vector2(it["p"].y, it["p"].x)
+	queue_redraw()
+
+
 func clear() -> void:
 	_items.clear()
 	queue_redraw()

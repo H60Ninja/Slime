@@ -34,7 +34,7 @@ Colour lives in a second interleaved float array `_c` holding Kubelka-Munk K/S p
 with the slime in `_smear` (thickness-weighted) and blended by `_mix`. `drop()` pours a colour
 at the centroid; `stamp()` presses a star/heart polygon in. `scripts/addins.gd` holds beads and
 stars that `advect`/`push_out` with the fingers. Styles are shader-uniform sets in
-`Slime.STYLES`. `scripts/bubbles.gd` spawns/pops bubbles (hooked from the finger loop in slime.gd); `scripts/pour.gd` is the falling-drop animation main.gd spawns on a palette tap, calling `slime.drop()` on landing. UI buttons are drawn in code (`ui.gd` IconControl) — no image assets, no text.
+`Slime.STYLES`. `scripts/bubbles.gd` spawns/pops bubbles (hooked from the finger loop in slime.gd); `scripts/pour.gd` is the falling-drop animation main.gd spawns on a palette tap, calling `slime.drop()` on landing. `scripts/mixing.gd` is the first-run make-slime ritual (main.gd swaps it in for the slime; + skips). Snapshot: main.gd `_save_to_gallery` uses `Engine.get_singleton("AndroidRuntime")` + `JavaClassWrapper` to insert into MediaStore (Pictures/Slime), falling back to user://. Portrait: main.gd switches `content_scale_size` 1920x1200 <-> 1200x1920 and slime.gd transposes its grid. UI buttons are drawn in code (`ui.gd` IconControl) — no image assets, no text.
 
 ## Rules
 - No internet permission, no analytics, no ads, no text in the UI (kids may not read).

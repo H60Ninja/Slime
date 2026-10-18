@@ -92,6 +92,34 @@ def bubble(seed):
     e = env(n, SR * 0.001, 2.5)
     return [math.sin(2 * math.pi * (f0 + 600 * (i / n)) * i / SR) * e[i] for i in range(n)]
 
+def crackle(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.3)
+    out = [0.0] * n
+    t = 0
+    while t < n - 300:
+        amp = rnd.uniform(0.4, 1.0)
+        for k in range(260):
+            out[t + k] += rnd.uniform(-1, 1) * amp * (1 - k / 260) ** 4
+        t += rnd.randint(300, 1400)
+    return lowpass(out, lambda i: 5000)
+
+def poof(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.3)
+    noise = [rnd.uniform(-1, 1) for _ in range(n)]
+    wet = lowpass(noise, lambda i: 400 + 900 * (1 - i / n))
+    e = [math.sin(math.pi * min(1.0, i / (n * 0.95))) ** 0.8 for i in range(n)]
+    return [wet[i] * e[i] for i in range(n)]
+
+def click(seed):
+    n = int(SR * 0.08)
+    out = []
+    for i in range(n):
+        e = (1 - i / n) ** 6
+        out.append((math.sin(2 * math.pi * 2400 * i / SR) + 0.5 * math.sin(2 * math.pi * 900 * i / SR)) * e)
+    return out
+
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "game/assets/sfx"
     os.makedirs(out, exist_ok=True)
@@ -104,3 +132,6 @@ if __name__ == "__main__":
     write(os.path.join(out, "sprinkle.wav"), sprinkle(5))
     for k in range(3):
         write(os.path.join(out, f"bubble{k}.wav"), bubble(20 + k))
+    write(os.path.join(out, "crackle.wav"), crackle(30))
+    write(os.path.join(out, "poof.wav"), poof(31))
+    write(os.path.join(out, "click.wav"), click(32))

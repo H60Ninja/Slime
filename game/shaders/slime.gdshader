@@ -19,6 +19,8 @@ uniform float alpha_k = 1.0;      // < 1 = translucent (clear slime)
 uniform float clear_k = 0.0;
 uniform float metal = 0.0;
 uniform float matte = 0.0;
+uniform float crunch = 0.0;      // foam beads bumps + speckles
+uniform float fluff = 0.0;       // soft fine texture
 
 void bspline(float t, out vec4 w, out vec4 dw) {
 	float t2 = t * t;
@@ -81,6 +83,23 @@ void fragment() {
 	if (wobble > 0.001) {
 		slope += wobble * 0.6 * vec2(sin(time * 28.0 + UV.y * 9.0), cos(time * 23.0 + UV.x * 9.0));
 	}
+	float speck = 0.0;
+	if (crunch > 0.0) {
+		vec2 buv = UV * grid * 0.07;
+		float b0 = texture(noise_tex, buv).r;
+		float bx = texture(noise_tex, buv + vec2(0.004, 0.0)).r;
+		float by = texture(noise_tex, buv + vec2(0.0, 0.004)).r;
+		float bump = smoothstep(0.6, 1.0, b0);
+		slope += crunch * vec2(bx - b0, by - b0) * 90.0 * bump;
+		speck = smoothstep(0.90, 0.97, b0) * crunch;
+	}
+	if (fluff > 0.0) {
+		vec2 fuv = UV * grid * 0.16;
+		float f0 = texture(noise_tex, fuv).r;
+		float fx = texture(noise_tex, fuv + vec2(0.006, 0.0)).r;
+		float fy = texture(noise_tex, fuv + vec2(0.0, 0.006)).r;
+		slope += fluff * vec2(fx - f0, fy - f0) * 25.0;
+	}
 	vec3 n = normalize(vec3(-slope, 1.0));
 	vec3 L = normalize(vec3(-0.45, -0.55, 0.75));
 	vec3 V = vec3(0.0, 0.0, 1.0);
@@ -96,7 +115,9 @@ void fragment() {
 	base = mix(base, cbase * 0.72, metal);
 	base = mix(base, base * 1.12 + 0.08, clear_k * 0.6);
 	vec3 spec_col = mix(vec3(1.0), cbase * 1.2 + 0.2, metal);
+	base = mix(base, base * 0.9 + 0.1, fluff * 0.6);
 	vec3 col = base * diff + spec_col * spec + base * rim;
+	col = mix(col, vec3(1.0), speck * 0.75);
 
 	if (sparkle > 0.5) {
 		vec2 nuv = UV * vec2(6.0, 4.0) + vec2(sin(time * 0.7), cos(time * 0.9)) * 0.05;

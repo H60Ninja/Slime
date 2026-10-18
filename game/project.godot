@@ -14,7 +14,7 @@ config/icon="res://icon.svg"
 
 window/size/viewport_width=1920
 window/size/viewport_height=1200
-window/handheld/orientation=4
+window/handheld/orientation=6
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 

@@ -1,7 +1,7 @@
 extends CanvasLayer
 class_name SlimeUI
-## Icon-only controls. Right: colour dots (tap = pour a drop of that colour).
-## Bottom-left: new lump, four slime styles, sparkle toggle, beads, stars. No text.
+## Icon-only controls. Right column: colours (tap = pour a drop). Left column: slime
+## kinds. Bottom row: new lump, sparkle, beads, stars, star stamp, heart stamp, camera.
 
 signal color_picked(c: Color, from: Vector2)
 signal style_picked(style: String)
@@ -9,6 +9,7 @@ signal sparkle_toggled(on: bool)
 signal addin_pressed(kind: int)
 signal stamp_pressed(shape: String)
 signal reset_pressed
+signal snapshot_pressed
 
 const PALETTE: Array[Color] = [
 	Color("6fe36a"),  # lime
@@ -22,10 +23,11 @@ const PALETTE: Array[Color] = [
 	Color("f4f4ff"),  # cloud
 	Color("2c2c5e"),  # galaxy
 ]
-const STYLES := ["shiny", "clear", "metal", "cloud"]
+const STYLES := ["shiny", "clear", "metal", "cloud", "crunchy", "butter", "fluffy"]
 const DOT := 88.0
 
-enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART }
+enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART, CRUNCHY, BUTTER, FLUFFY, CAMERA }
+const STYLE_ICONS := [Icon.SHINY, Icon.CLEAR, Icon.METAL, Icon.CLOUD, Icon.CRUNCHY, Icon.BUTTER, Icon.FLUFFY]
 
 var _buttons: Array[Button] = []
 var _style_buttons: Array[Button] = []
@@ -33,6 +35,9 @@ var _selected := 0
 var _style := 0
 var _sparkle := false
 var _spark_btn: Button
+var _pulse_target: Control = null
+var _pulse_t := 0.0
+var _pulse: PulseRing
 
 
 func _ready() -> void:
@@ -50,27 +55,37 @@ func _ready() -> void:
 		col.add_child(b)
 		_buttons.append(b)
 
+	var left := VBoxContainer.new()
+	left.name = "Styles"
+	add_child(left)
+	left.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	left.offset_left = 24
+	left.offset_right = 24 + DOT
+	left.add_theme_constant_override("separation", 14)
+	left.alignment = BoxContainer.ALIGNMENT_CENTER
+	for i in STYLES.size():
+		var b := _round_button(Color.WHITE)
+		b.add_child(_icon(STYLE_ICONS[i]))
+		b.pressed.connect(_on_style.bind(i))
+		left.add_child(b)
+		_style_buttons.append(b)
+
 	var row := HBoxContainer.new()
 	row.name = "Tools"
 	add_child(row)
-	row.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	row.offset_left = 24
+	row.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	row.offset_left = 24 + DOT + 30
+	row.offset_right = -(24 + DOT + 30)
 	row.offset_bottom = -24
 	row.offset_top = -24 - DOT
 	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var fresh := _round_button(Color.WHITE)
+	fresh.name = "New"
 	fresh.add_child(_icon(Icon.PLUS))
 	fresh.pressed.connect(func(): reset_pressed.emit())
 	row.add_child(fresh)
-
-	row.add_child(_spacer())
-	for i in STYLES.size():
-		var b := _round_button(Color.WHITE)
-		b.add_child(_icon([Icon.SHINY, Icon.CLEAR, Icon.METAL, Icon.CLOUD][i]))
-		b.pressed.connect(_on_style.bind(i))
-		row.add_child(b)
-		_style_buttons.append(b)
 
 	row.add_child(_spacer())
 	_spark_btn = _round_button(Color.WHITE)
@@ -98,12 +113,40 @@ func _ready() -> void:
 	ht.pressed.connect(func(): stamp_pressed.emit("heart"))
 	row.add_child(ht)
 
+	row.add_child(_spacer())
+	var cam := _round_button(Color.WHITE)
+	cam.add_child(_icon(Icon.CAMERA))
+	cam.pressed.connect(func(): snapshot_pressed.emit())
+	row.add_child(cam)
+
+	_pulse = PulseRing.new()
+	_pulse.visible = false
+	add_child(_pulse)
+
 	_refresh_selection()
+
+
+## Draw an attention ring around a palette dot ("pick a colour") or hide it.
+func pulse_palette(on: bool) -> void:
+	_pulse_target = _buttons[_selected] if on else null
+	_pulse.visible = on
+
+
+func _process(delta: float) -> void:
+	if _pulse_target:
+		_pulse_t += delta
+		_pulse.position = _pulse_target.global_position + _pulse_target.size * 0.5
+		_pulse.t = _pulse_t
+		_pulse.queue_redraw()
+
+
+func palette_dot_position(i: int) -> Vector2:
+	return _buttons[i].global_position + _buttons[i].size * 0.5
 
 
 func _spacer() -> Control:
 	var c := Control.new()
-	c.custom_minimum_size = Vector2(14, 1)
+	c.custom_minimum_size = Vector2(10, 1)
 	return c
 
 
@@ -157,7 +200,7 @@ func set_state(c: Color, style: String, sparkle: bool) -> void:
 func _on_color(i: int) -> void:
 	_selected = i
 	_refresh_selection()
-	color_picked.emit(PALETTE[i], _buttons[i].global_position + _buttons[i].size * 0.5)
+	color_picked.emit(PALETTE[i], palette_dot_position(i))
 
 
 func _on_style(i: int) -> void:
@@ -180,6 +223,13 @@ func _icon(kind: Icon) -> Control:
 	return c
 
 
+class PulseRing extends Node2D:
+	var t := 0.0
+	func _draw() -> void:
+		var k := fmod(t, 1.2) / 1.2
+		draw_arc(Vector2.ZERO, 52.0 + 30.0 * k, 0.0, TAU, 40, Color(1, 1, 1, 0.9 * (1.0 - k)), 7.0 * (1.0 - k) + 1.0, true)
+
+
 class IconControl extends Control:
 	var kind: int = 0
 
@@ -191,6 +241,15 @@ class IconControl extends Control:
 			pts.append(c + Vector2(cos(a), sin(a)) * r)
 		return pts
 
+	func _heart(c: Vector2, scale: float) -> PackedVector2Array:
+		var hp := PackedVector2Array()
+		for i in 40:
+			var t := TAU * i / 40.0
+			var x := 16.0 * pow(sin(t), 3.0)
+			var y := -(13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t))
+			hp.append(c + Vector2(x, y) * scale + Vector2(0, 2))
+		return hp
+
 	func _draw() -> void:
 		var c := size * 0.5
 		match kind:
@@ -199,7 +258,7 @@ class IconControl extends Control:
 				draw_line(c + Vector2(0, -24), c + Vector2(0, 24), Color("4fb8ff"), 10.0, true)
 			1:  # STAR (sparkle)
 				draw_colored_polygon(_star(c, 26, 11), Color("ffd84d"))
-			2:  # SHINY: glossy ball
+			2:  # SHINY
 				draw_circle(c, 24, Color("6fe36a"))
 				draw_circle(c + Vector2(-8, -9), 7, Color(1, 1, 1, 0.85))
 			3:  # CLEAR: water drop
@@ -208,12 +267,10 @@ class IconControl extends Control:
 					var a := TAU * i / 24
 					pts.append(c + Vector2(cos(a) * 18, sin(a) * 18 + 8))
 				pts.append(c + Vector2(0, -28))
-				var hull := Geometry2D.convex_hull(pts)
-				draw_colored_polygon(hull, Color("7fd3ff"))
+				draw_colored_polygon(Geometry2D.convex_hull(pts), Color("7fd3ff"))
 				draw_circle(c + Vector2(-6, 8), 5, Color(1, 1, 1, 0.8))
 			4:  # METAL: diamond
-				var d := PackedVector2Array([c + Vector2(0, -26), c + Vector2(24, 0), c + Vector2(0, 26), c + Vector2(-24, 0)])
-				draw_colored_polygon(d, Color("b8c0d0"))
+				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -26), c + Vector2(24, 0), c + Vector2(0, 26), c + Vector2(-24, 0)]), Color("b8c0d0"))
 				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -26), c + Vector2(24, 0), c + Vector2(0, 0)]), Color("e8ecf4"))
 			5:  # CLOUD
 				var col := Color("9fb7ff")
@@ -228,16 +285,32 @@ class IconControl extends Control:
 			7:  # STARS (confetti)
 				draw_colored_polygon(_star(c + Vector2(-10, 6), 15, 6), Color("ff9ad5"))
 				draw_colored_polygon(_star(c + Vector2(13, -8), 11, 4.5, 0.4), Color("ffd84d"))
-			8:  # STAMP_STAR: outlined cutter
+			8:  # STAMP_STAR
 				var sp := _star(c, 26, 12)
 				sp.append(sp[0])
 				draw_polyline(sp, Color("8a8fa8"), 6.0, true)
-			9:  # STAMP_HEART: outlined cutter
-				var hp := PackedVector2Array()
-				for i in 40:
-					var t := TAU * i / 40.0
-					var x := 16.0 * pow(sin(t), 3.0)
-					var y := -(13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t))
-					hp.append(c + Vector2(x, y) * 1.5 + Vector2(0, 2))
+			9:  # STAMP_HEART
+				var hp := _heart(c, 1.5)
 				hp.append(hp[0])
 				draw_polyline(hp, Color("ff7aa8"), 6.0, true)
+			10:  # CRUNCHY: ball with foam beads
+				draw_circle(c, 24, Color("6fe36a"))
+				for q in [Vector2(-9, -6), Vector2(8, -10), Vector2(10, 8), Vector2(-6, 11), Vector2(0, 0)]:
+					draw_circle(c + q, 5, Color(1, 1, 1, 0.9))
+			11:  # BUTTER: a pat of butter
+				var r := Rect2(c + Vector2(-24, -12), Vector2(48, 30))
+				draw_rect(r, Color("ffe08a"))
+				draw_rect(Rect2(c + Vector2(-24, -18), Vector2(48, 10)), Color("fff2bf"))
+			12:  # FLUFFY: pink puffs
+				var pc := Color("ffb6de")
+				draw_circle(c + Vector2(-12, 6), 12, pc)
+				draw_circle(c + Vector2(2, -6), 15, pc)
+				draw_circle(c + Vector2(15, 7), 11, pc)
+				draw_rect(Rect2(c + Vector2(-12, 6), Vector2(27, 12)), pc)
+				draw_circle(c + Vector2(-2, -10), 5, Color(1, 1, 1, 0.8))
+			13:  # CAMERA
+				var body := Rect2(c + Vector2(-26, -14), Vector2(52, 36))
+				draw_rect(body, Color("5a6478"))
+				draw_rect(Rect2(c + Vector2(-10, -22), Vector2(20, 10)), Color("5a6478"))
+				draw_circle(c + Vector2(0, 4), 12, Color("e8ecf4"))
+				draw_circle(c + Vector2(0, 4), 7, Color("4fb8ff"))

@@ -4,12 +4,14 @@ A touch slime toy for little kids on Android tablets (Fire tablets and Google Ki
 Space tablets). A lump of slime on a table: press craters into it, drag it into strands,
 pinch up ridges, pour in colours (they fall from the palette and splash) and swirl them
 together like paint (yellow + blue makes green), pop the bubbles that rise under your finger, stamp stars and hearts, sprinkle
-beads and stars, switch between shiny, clear, metallic and cloud slime. No text, no ads,
-no internet.
+beads and stars, switch between seven slime kinds. First run walks through making the
+slime: pour glue, pick a colour, pour activator, stir. No text, no ads, no internet.
 
 **Controls (all icons):** right column = colours (tap to pour a drop, swirl to mix).
-Bottom row = new lump · shiny / clear / metal / cloud · sparkle · beads · stars ·
-star stamp · heart stamp.
+Left column = slime kind: shiny · clear · metal · cloud · crunchy · butter · fluffy.
+Bottom row = new lump (starts the make-slime ritual; tap again to skip) · sparkle ·
+beads · stars · star stamp · heart stamp · camera (saves to the tablet's Pictures).
+Works in landscape and portrait.
 
 - Godot 4.7 / GDScript. The slime is a lump on a table simulated as a thickness field on
   an 80x52 grid: fingers press (crater + displaced rim), smear (semi-Lagrangian advection

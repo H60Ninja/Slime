@@ -15,8 +15,12 @@ connection and it collects nothing.
 - **Local settings only.** The chosen slime colour and sparkle setting are saved on the
   device so they are remembered next time. They never leave the device and are deleted
   when the app is uninstalled.
+- **Snapshots.** The camera button saves a picture of the slime into the tablet's own
+  Pictures folder (a "Slime" album) so it can be shown to a grown-up. The picture stays
+  on the device. Slime never reads other photos.
 - **Permissions.** The only permission used is vibration, for a tiny haptic tick when
-  the slime is poked.
+  the slime is poked. Saving a snapshot uses the standard Android media store and needs
+  no storage permission.
 
 This policy applies to all versions of Slime on the Amazon Appstore and Google Play.
 

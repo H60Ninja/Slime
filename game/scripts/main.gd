@@ -1,21 +1,28 @@
 extends Node2D
-## Root scene: table background, the slime, the icon UI, sounds.
+## Root scene: table background, the slime, the make-slime ritual, the icon UI, sounds.
 
 const SETTINGS := "user://settings.cfg"
 const SlimeScript := preload("res://scripts/slime.gd")
 const UIScript := preload("res://scripts/ui.gd")
 const PourScript := preload("res://scripts/pour.gd")
+const MixingScript := preload("res://scripts/mixing.gd")
 
 var slime: Node2D
 var ui: CanvasLayer
+var mixing: Node2D = null
+var _play_area := Rect2()
 var _squish: Array[AudioStreamPlayer] = []
 var _pop: AudioStreamPlayer
 var _slurp: AudioStreamPlayer
 var _squelch: AudioStreamPlayer
 var _stretch: AudioStreamPlayer
 var _sprinkle: AudioStreamPlayer
+var _crackle: AudioStreamPlayer
+var _poof: AudioStreamPlayer
+var _click: AudioStreamPlayer
 var _bubble: Array[AudioStreamPlayer] = []
 var _fps_timer := 0.0
+var _snapping := false
 
 
 func _ready() -> void:
@@ -30,15 +37,16 @@ func _ready() -> void:
 	add_child(ui)
 
 	ui.color_picked.connect(_on_color)
-	ui.style_picked.connect(func(s: String): slime.style = s; slime.wobble(0.6); _play(_squish.pick_random()); _save())
+	ui.style_picked.connect(func(s: String): slime.style = s; slime.wobble(0.6); _play(_touch_sound()); _save())
 	ui.sparkle_toggled.connect(func(on: bool): slime.sparkle = on; _play(_pop); _save())
-	ui.reset_pressed.connect(func(): slime.reset(); _play(_slurp))
+	ui.reset_pressed.connect(_on_new)
 	ui.addin_pressed.connect(func(kind: int): slime.addins.sprinkle(kind, 10); _play(_sprinkle))
 	ui.stamp_pressed.connect(func(shape: String): slime.stamp(shape); _play(_squelch))
-	slime.touched.connect(func(inside: bool): if inside: _play(_squish.pick_random()))
+	ui.snapshot_pressed.connect(_snapshot)
+	slime.touched.connect(func(inside: bool): if inside: _play(_touch_sound()))
 	slime.released.connect(func(inside: bool): if inside: _play(_pop); slime.wobble(0.3))
-	slime.stretched.connect(func(): _play(_stretch))
-	slime.held.connect(func(): _play(_squelch))
+	slime.stretched.connect(func(): _play(_crackle if slime.style == "crunchy" else _stretch))
+	slime.held.connect(func(): _play(_poof if slime.style == "fluffy" else _squelch))
 	slime.bubbles.popped.connect(func(): _play(_bubble.pick_random()))
 
 	for k in 3:
@@ -48,12 +56,26 @@ func _ready() -> void:
 	_squelch = _player("res://assets/sfx/squelch.wav", -3.0)
 	_stretch = _player("res://assets/sfx/stretch.wav", -4.0)
 	_sprinkle = _player("res://assets/sfx/sprinkle.wav", -2.0)
+	_crackle = _player("res://assets/sfx/crackle.wav", -3.0)
+	_poof = _player("res://assets/sfx/poof.wav", -3.0)
+	_click = _player("res://assets/sfx/click.wav", -4.0)
 	for k in 3:
 		_bubble.append(_player("res://assets/sfx/bubble%d.wav" % k, -8.0))
 
-	_load()
 	get_tree().root.size_changed.connect(_layout)
 	_layout()
+	var first_run := not _load()
+	if first_run:
+		_start_mixing()
+
+
+func _touch_sound() -> AudioStreamPlayer:
+	match slime.style:
+		"crunchy":
+			return _crackle
+		"fluffy":
+			return _poof
+	return _squish.pick_random()
 
 
 func _build_background() -> void:
@@ -80,10 +102,19 @@ func _build_background() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
+## Landscape uses a 1920x1200 canvas, portrait 1200x1920; the UI anchors do the rest.
 func _layout() -> void:
-	var vp := get_viewport_rect().size
-	# Leave room for the palette column on the right and a margin everywhere.
-	slime.play_area = Rect2(70, 70, vp.x - 70 - 150, vp.y - 140)
+	var win := get_window().size
+	var portrait: bool = win.y > win.x
+	var want := Vector2i(1200, 1920) if portrait else Vector2i(1920, 1200)
+	if get_tree().root.content_scale_size != want:
+		get_tree().root.content_scale_size = want
+	var vp := Vector2(want)
+	var side := 24.0 + 88.0 + 30.0
+	_play_area = Rect2(side, 60, vp.x - side * 2.0, vp.y - 60 - 150)
+	slime.play_area = _play_area
+	if mixing:
+		mixing.set_area(_play_area)
 
 
 func _player(path: String, db := 0.0) -> AudioStreamPlayer:
@@ -99,16 +130,159 @@ func _play(p: AudioStreamPlayer) -> void:
 	p.play()
 
 
+# ---------------------------------------------------------------- make-slime ritual
+
+func _start_mixing() -> void:
+	if mixing:
+		return
+	mixing = MixingScript.new()
+	mixing.name = "Mixing"
+	mixing.set_area(_play_area)
+	mixing.need_color.connect(func(on: bool): ui.pulse_palette(on))
+	mixing.poured.connect(func(): _play(_slurp))
+	mixing.stirring.connect(func(): _play(_squish.pick_random()))
+	mixing.done.connect(_on_mixed)
+	add_child(mixing)
+	slime.visible = false
+	slime.set_process_unhandled_input(false)
+	slime.set_physics_process(false)
+
+
+func _on_mixed(col: Color) -> void:
+	mixing = null
+	ui.pulse_palette(false)
+	slime.color = col
+	slime.reset()
+	slime.visible = true
+	slime.set_process_unhandled_input(true)
+	slime.set_physics_process(true)
+	_play(_slurp)
+	_save()
+
+
+func _on_new() -> void:
+	if mixing:
+		# second tap on + skips the ritual
+		mixing.queue_free()
+		_on_mixed(slime.color)
+		return
+	_start_mixing()
+
+
 func _on_color(c: Color, from: Vector2) -> void:
 	var pour := PourScript.new()
 	pour.color = c
 	pour.start = from
-	pour.target = slime.drop_target()
+	pour.target = mixing.bowl_center if mixing else slime.drop_target()
 	pour.position = from
-	pour.landed.connect(func(col: Color, _at: Vector2): slime.drop(col); _play(_slurp); _save())
+	if mixing:
+		pour.landed.connect(func(col: Color, _at: Vector2): if mixing: mixing.add_color(col); slime.color = col; _play(_slurp); _save())
+	else:
+		pour.landed.connect(func(col: Color, _at: Vector2): slime.drop(col); _play(_slurp); _save())
 	add_child(pour)
 	_play(_pop)
 
+
+# ---------------------------------------------------------------- snapshot
+
+func _snapshot() -> void:
+	if _snapping or mixing:
+		return
+	_snapping = true
+	_play(_click)
+	ui.visible = false
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	ui.visible = true
+	var saved := _save_image(img)
+	_flash_and_polaroid(img, saved)
+	_snapping = false
+
+
+func _save_image(img: Image) -> bool:
+	var stamp := Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
+	var name := "slime-%s.png" % stamp
+	if _save_to_gallery(img, name):
+		return true
+	var pics := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
+	if pics != "":
+		var dir := pics.path_join("Slime")
+		if DirAccess.make_dir_recursive_absolute(dir) == OK and img.save_png(dir.path_join(name)) == OK:
+			return true
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://snapshots"))
+	return img.save_png("user://snapshots/" + name) == OK
+
+
+## Android 10+: insert the PNG into MediaStore (Pictures/Slime) so it shows in the
+## tablet's gallery with no storage permission. Uses Godot's JavaClassWrapper.
+func _save_to_gallery(img: Image, name: String) -> bool:
+	if OS.get_name() != "Android":
+		return false
+	var rt = Engine.get_singleton("AndroidRuntime")
+	if rt == null:
+		return false
+	var activity = rt.getActivity()
+	if activity == null:
+		return false
+	var resolver = activity.getContentResolver()
+	var ContentValues = JavaClassWrapper.wrap("android.content.ContentValues")
+	var values = ContentValues.ContentValues()
+	values.put("_display_name", name)
+	values.put("mime_type", "image/png")
+	values.put("relative_path", "Pictures/Slime")
+	var Media = JavaClassWrapper.wrap("android.provider.MediaStore$Images$Media")
+	var collection = Media.getContentUri("external")
+	var uri = resolver.insert(collection, values)
+	if JavaClassWrapper.get_exception() != null or uri == null:
+		push_warning("MediaStore insert failed")
+		return false
+	var out = resolver.openOutputStream(uri)
+	if JavaClassWrapper.get_exception() != null or out == null:
+		return false
+	out.write(img.save_png_to_buffer())
+	out.flush()
+	out.close()
+	if JavaClassWrapper.get_exception() != null:
+		push_warning("MediaStore write failed")
+		return false
+	return true
+
+
+func _flash_and_polaroid(img: Image, _saved: bool) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 5
+	add_child(layer)
+	var flash := ColorRect.new()
+	flash.color = Color(1, 1, 1, 0.85)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(flash)
+	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var card := TextureRect.new()
+	card.texture = ImageTexture.create_from_image(img)
+	card.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	card.stretch_mode = TextureRect.STRETCH_SCALE
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vp := Vector2(get_tree().root.content_scale_size)
+	card.size = vp * 0.5
+	card.pivot_offset = card.size * 0.5
+	card.position = vp * 0.25
+	layer.add_child(card)
+	var frame := ReferenceRect.new()
+	frame.editor_only = false
+	frame.border_color = Color.WHITE
+	frame.border_width = 14.0
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(frame)
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(flash, "color:a", 0.0, 0.35)
+	tw.tween_property(card, "scale", Vector2(0.18, 0.18), 0.9).set_delay(0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(card, "position", Vector2(vp.x * 0.5 - card.size.x * 0.5, vp.y - card.size.y * 0.5 - 40), 0.9).set_delay(0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(card, "modulate:a", 0.0, 0.4).set_delay(1.6)
+	tw.chain().tween_callback(layer.queue_free)
+
+
+# ---------------------------------------------------------------- settings
 
 func _save() -> void:
 	var cf := ConfigFile.new()
@@ -118,15 +292,17 @@ func _save() -> void:
 	cf.save(SETTINGS)
 
 
-func _load() -> void:
+## Returns false on a fresh install (no settings yet).
+func _load() -> bool:
 	var cf := ConfigFile.new()
 	if cf.load(SETTINGS) != OK:
-		return
+		return false
 	slime.color = cf.get_value("slime", "color", slime.color)
 	slime.sparkle = cf.get_value("slime", "sparkle", false)
 	slime.style = cf.get_value("slime", "style", "shiny")
 	slime.reset()
 	ui.set_state(slime.color, slime.style, slime.sparkle)
+	return true
 
 
 func _process(delta: float) -> void:

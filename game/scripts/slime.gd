@@ -10,13 +10,20 @@ signal released(inside: bool)
 signal stretched          ## a fast drag through slime (sound hook)
 signal held               ## finger held still on slime for a moment (sound hook)
 
-const GW := 80
-const GH := 52
+var GW := 80
+var GH := 52
+const UNIFORMS := ["spec_k", "spec_pow", "alpha_k", "clear_k", "metal", "matte", "crunch", "fluff", "thick_px"]
 const STYLES := {
-	"shiny": {"spec_k": 0.5, "spec_pow": 70.0, "alpha_k": 1.0, "clear_k": 0.0, "metal": 0.0, "matte": 0.0},
-	"clear": {"spec_k": 0.8, "spec_pow": 90.0, "alpha_k": 0.68, "clear_k": 1.0, "metal": 0.0, "matte": 0.0},
-	"metal": {"spec_k": 1.1, "spec_pow": 36.0, "alpha_k": 1.0, "clear_k": 0.0, "metal": 1.0, "matte": 0.0},
-	"cloud": {"spec_k": 0.12, "spec_pow": 16.0, "alpha_k": 1.0, "clear_k": 0.0, "metal": 0.0, "matte": 1.0},
+	"shiny":   {"spec_k": 0.5,  "spec_pow": 70.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0},
+	"clear":   {"spec_k": 0.8,  "spec_pow": 90.0, "alpha_k": 0.68, "clear_k": 1.0, "metal": 0.0, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0},
+	"metal":   {"spec_k": 1.1,  "spec_pow": 36.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 1.0, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0},
+	"cloud":   {"spec_k": 0.12, "spec_pow": 16.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 1.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0},
+	"crunchy": {"spec_k": 0.45, "spec_pow": 50.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.1,  "crunch": 1.0, "fluff": 0.0, "thick_px": 230.0,
+				"smear": 0.8, "slump": 0.7, "press": 0.8},
+	"butter":  {"spec_k": 0.15, "spec_pow": 12.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.75, "crunch": 0.0, "fluff": 0.0, "thick_px": 200.0,
+				"smear": 1.15, "slump": 3.0, "press": 1.3},
+	"fluffy":  {"spec_k": 0.2,  "spec_pow": 20.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.55, "crunch": 0.0, "fluff": 1.0, "thick_px": 330.0,
+				"smear": 0.8, "slump": 0.6, "press": 1.4},
 }
 
 @export var play_area := Rect2(70, 70, 1630, 1060):
@@ -44,8 +51,11 @@ var style := "shiny":
 		if not STYLES.has(v):
 			return
 		style = v
+		_smear_mult = STYLES[v].get("smear", 1.0)
+		_slump_mult = STYLES[v].get("slump", 1.0)
+		_press_mult = STYLES[v].get("press", 1.0)
 		if _mat:
-			for k in STYLES[v]:
+			for k in UNIFORMS:
 				_mat.set_shader_parameter(k, STYLES[v][k])
 
 var addins: Node2D
@@ -62,6 +72,9 @@ var _tick := 0
 var _time := 0.0
 var _wobble := 0.0
 var _stretch_cd := 0.0
+var _smear_mult := 1.0
+var _slump_mult := 1.0
+var _press_mult := 1.0
 
 var _rect: ColorRect
 var _mat: ShaderMaterial
@@ -118,10 +131,48 @@ func _ready() -> void:
 func _layout() -> void:
 	if _rect == null:
 		return
+	var want_w := 80 if play_area.size.x >= play_area.size.y else 52
+	var want_h := 52 if play_area.size.x >= play_area.size.y else 80
+	if want_w != GW:
+		_transpose_grid(want_w, want_h)
 	_rect.position = play_area.position
 	_rect.size = play_area.size
 	_cell = Vector2(play_area.size.x / GW, play_area.size.y / GH)
 	_mat.set_shader_parameter("cell_px", _cell)
+	_mat.set_shader_parameter("grid", Vector2(GW, GH))
+
+
+## Rotate the tablet: swap grid axes, carrying the slime over (transposed).
+func _transpose_grid(w: int, h: int) -> void:
+	var oh := PackedFloat32Array()
+	var oc := PackedFloat32Array()
+	oh.resize(w * h)
+	oc.resize(w * h * 3)
+	if _h.size() == GW * GH and _h.size() > 0:
+		for y in h:
+			for x in w:
+				var i := y * w + x
+				var j := x * GW + y   # old (x=y, y=x)
+				oh[i] = _h[j]
+				oc[i * 3] = _c[j * 3]
+				oc[i * 3 + 1] = _c[j * 3 + 1]
+				oc[i * 3 + 2] = _c[j * 3 + 2]
+	GW = w
+	GH = h
+	_h = oh
+	_c = oc
+	_tmp.resize(w * h)
+	_ctmp.resize(w * h * 3)
+	_img = Image.create_empty(GW, GH, false, Image.FORMAT_RF)
+	_tex = ImageTexture.create_from_image(_img)
+	_cimg = Image.create_empty(GW, GH, false, Image.FORMAT_RGBF)
+	_ctex = ImageTexture.create_from_image(_cimg)
+	_mat.set_shader_parameter("height_tex", _tex)
+	_mat.set_shader_parameter("color_tex", _ctex)
+	if addins:
+		addins.transpose()
+	if bubbles:
+		bubbles.clear()
 
 
 func cell_size() -> Vector2:
@@ -367,7 +418,7 @@ func _physics_process(delta: float) -> void:
 		var speed := v.length()
 		var on_slime := _sample(pos.x - 0.5, pos.y - 0.5) > 0.05
 		if speed > 0.03:
-			_smear(pos, v, rf * 1.9)
+			_smear(pos, v * _smear_mult, rf * 1.9)
 			addins.advect(pos, v * smear_strength, rf * 1.9)
 			bubbles.pop_near(to_px(pos), finger_px * 1.1)
 			if on_slime and speed > 0.5 and _tick % 10 == 0:
@@ -383,11 +434,11 @@ func _physics_process(delta: float) -> void:
 				held.emit()
 			if on_slime and f["still"] >= 8 and f["still"] % 10 == 0:
 				bubbles.spawn(to_px(pos) + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * finger_px * 1.6)
-		var k := press_rate * (1.0 - 0.55 * clampf(speed / 1.5, 0.0, 1.0))
+		var k := press_rate * _press_mult * (1.0 - 0.55 * clampf(speed / 1.5, 0.0, 1.0))
 		_press(pos, rf, k)
 		addins.push_out(pos, rf)
 	if _tick % 3 == 0:
-		_relax(slump * 3.0)
+		_relax(slump * 3.0 * _slump_mult)
 	if _tick % 6 == 0:
 		_mix(mix_rate)
 	if _tick % 4 == 0:

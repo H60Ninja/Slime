@@ -18,7 +18,10 @@ slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like
 
 - Real molding physics: craters, strands, ridges, peaks — it keeps your shape
 - 10 bright colours: pour drops in and swirl them like real paint — yellow and blue make green
-- Four slime types: shiny, clear, metallic, cloud — plus sparkle
+- Seven slime kinds: shiny, clear, metallic, cloud, crunchy, butter, fluffy — plus sparkle
+- Make your own slime first: pour the glue, pick a colour, add activator, stir it up
+- Camera button saves your creation to the tablet's Pictures to show a grown-up
+- Works in landscape and portrait
 - Sprinkle in beads and stars that sink in and ride along with the slime
 - Star and heart cookie-cutter stamps
 - Bubbles rise under a held finger and pop when you sweep through them
@@ -47,8 +50,9 @@ or paste the raw GitHub URL of docs/privacy.md — both stores accept any public
 
 ## Assets
 - Icon 512×512: `game/icons/icon_512.png`
+- Feature graphic 1024×500 (Google): `store/feature-graphic.png`
 - Screenshots 1920×1200: `store/screenshots/*.png` (both stores accept landscape tablet
-  shots; Google also wants a 1024×500 feature graphic — see `store/feature-graphic.png`).
+  shots).
 
 ## Builds
 - Amazon Appstore: upload `build/slime-release.apk` (`make export-apk-release`).
