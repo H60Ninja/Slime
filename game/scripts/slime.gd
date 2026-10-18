@@ -205,7 +205,9 @@ func reset() -> void:
 			var dx := (x + 0.5 - c.x) / rx
 			var dy := (y + 0.5 - c.y) / ry
 			var d2 := dx * dx + dy * dy
-			_h[y * GW + x] = pow(1.0 - d2, 0.55) * 0.95 if d2 < 1.0 else 0.0
+			var d := sqrt(d2)
+			# cosine dome: rounded top, zero slope at the foot (no shelf, no scalloped edge)
+			_h[y * GW + x] = 0.95 * pow(0.5 + 0.5 * cos(PI * d), 0.55) if d < 1.0 else 0.0
 	var ks := to_ks(color)
 	for i in GW * GH:
 		_c[i * 3] = ks.x

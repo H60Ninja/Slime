@@ -85,13 +85,13 @@ void fragment() {
 	}
 	float speck = 0.0;
 	if (crunch > 0.0) {
-		vec2 buv = UV * grid * 0.07;
+		vec2 buv = UV * grid * 0.035;
 		float b0 = texture(noise_tex, buv).r;
-		float bx = texture(noise_tex, buv + vec2(0.004, 0.0)).r;
-		float by = texture(noise_tex, buv + vec2(0.0, 0.004)).r;
-		float bump = smoothstep(0.6, 1.0, b0);
-		slope += crunch * vec2(bx - b0, by - b0) * 90.0 * bump;
-		speck = smoothstep(0.90, 0.97, b0) * crunch;
+		float bx = texture(noise_tex, buv + vec2(0.002, 0.0)).r;
+		float by = texture(noise_tex, buv + vec2(0.0, 0.002)).r;
+		float bump = smoothstep(0.58, 1.0, b0);
+		slope += crunch * vec2(bx - b0, by - b0) * 120.0 * bump;
+		speck = smoothstep(0.86, 0.96, b0) * crunch;
 	}
 	if (fluff > 0.0) {
 		vec2 fuv = UV * grid * 0.16;
@@ -126,7 +126,7 @@ void fragment() {
 		col += vec3(1.0) * smoothstep(0.80, 0.93, g) * (0.5 + 0.5 * tw);
 	}
 
-	float alpha = smoothstep(0.025, 0.045, h) * alpha_k;
+	float alpha = smoothstep(0.02, 0.06, h) * alpha_k;
 	// soft drop shadow: slime a little up-left of this pixel casts onto the table
 	float hs = sample_h(UV - vec2(12.0, 16.0) / (grid * cell_px)).x;
 	float shadow = smoothstep(0.02, 0.2, hs) * 0.22;
