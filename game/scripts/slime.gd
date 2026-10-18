@@ -1,15 +1,23 @@
 extends Node2D
 class_name Slime
-## A lump of slime on a table, simulated as a thickness field on a coarse grid.
-## Fingers press (crater + rim), smear (carry slime along the stroke), pile up and
-## spread. Shapes persist and slump back only slowly. Total slime is conserved, so it
-## can never be lost. Rendering is a shader that lights the surface from its slopes.
+## A lump of slime on a table, simulated as a thickness field on a coarse grid with a
+## colour per cell. Fingers press (crater + rim), smear (carry slime and colour along
+## the stroke), pile up and spread. Shapes persist and slump only slowly. Total slime
+## is conserved, so it can never be lost. A shader lights the surface from its slopes.
 
 signal touched(inside: bool)
 signal released(inside: bool)
+signal stretched          ## a fast drag through slime (sound hook)
+signal held               ## finger held still on slime for a moment (sound hook)
 
 const GW := 80
 const GH := 52
+const STYLES := {
+	"shiny": {"spec_k": 0.5, "spec_pow": 70.0, "alpha_k": 1.0, "clear_k": 0.0, "metal": 0.0, "matte": 0.0},
+	"clear": {"spec_k": 0.8, "spec_pow": 90.0, "alpha_k": 0.68, "clear_k": 1.0, "metal": 0.0, "matte": 0.0},
+	"metal": {"spec_k": 1.1, "spec_pow": 36.0, "alpha_k": 1.0, "clear_k": 0.0, "metal": 1.0, "matte": 0.0},
+	"cloud": {"spec_k": 0.12, "spec_pow": 16.0, "alpha_k": 1.0, "clear_k": 0.0, "metal": 0.0, "matte": 1.0},
+}
 
 @export var play_area := Rect2(70, 70, 1630, 1060):
 	set(v):
@@ -20,37 +28,53 @@ const GH := 52
 @export var press_rate := 0.045        ## fraction of thickness pushed out per tick while pressing
 @export var smear_strength := 0.9      ## how much of the finger motion the slime follows
 @export var slump := 0.0012            ## diffusion per tick (lower = holds shapes longer)
+@export var mix_rate := 0.03           ## colour blending per relax step (kneading mixes colours)
 @export var h_cap := 2.6               ## max thickness (peaks)
+@export var drop_px := 140.0           ## radius of a colour drop
+@export var stamp_px := 170.0          ## radius of a cookie-cutter stamp
 
-var color: Color = Color("6fe36a"):
-	set(v):
-		color = v
-		if _mat:
-			_mat.set_shader_parameter("color", v)
+var color: Color = Color("6fe36a")     ## selected colour (used by drops and new lumps)
 var sparkle := false:
 	set(v):
 		sparkle = v
 		if _mat:
 			_mat.set_shader_parameter("sparkle", 1.0 if v else 0.0)
+var style := "shiny":
+	set(v):
+		if not STYLES.has(v):
+			return
+		style = v
+		if _mat:
+			for k in STYLES[v]:
+				_mat.set_shader_parameter(k, STYLES[v][k])
+
+var addins: Node2D
 
 var _h := PackedFloat32Array()
 var _tmp := PackedFloat32Array()
+var _c := PackedFloat32Array()     # rgb interleaved
+var _ctmp := PackedFloat32Array()
 var _mass0 := 0.0
-var _cell := Vector2(27, 27)
-var _fingers := {}  # index -> {pos: Vector2(grid), prev: Vector2(grid), ticks: int}
+var _cell := Vector2(20, 20)
+var _fingers := {}  # index -> {pos, prev, ticks, still, moved}
 var _tick := 0
 var _time := 0.0
 var _wobble := 0.0
+var _stretch_cd := 0.0
 
 var _rect: ColorRect
 var _mat: ShaderMaterial
 var _img: Image
 var _tex: ImageTexture
+var _cimg: Image
+var _ctex: ImageTexture
 
 
 func _ready() -> void:
 	_h.resize(GW * GH)
 	_tmp.resize(GW * GH)
+	_c.resize(GW * GH * 3)
+	_ctmp.resize(GW * GH * 3)
 	_rect = ColorRect.new()
 	_rect.name = "Surface"
 	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -68,13 +92,20 @@ func _ready() -> void:
 	ntex.invert = true
 	_mat.set_shader_parameter("noise_tex", ntex)
 	_mat.set_shader_parameter("grid", Vector2(GW, GH))
-	_mat.set_shader_parameter("color", color)
 	_mat.set_shader_parameter("sparkle", 1.0 if sparkle else 0.0)
 	_rect.material = _mat
 	add_child(_rect)
 	_img = Image.create_empty(GW, GH, false, Image.FORMAT_RF)
 	_tex = ImageTexture.create_from_image(_img)
+	_cimg = Image.create_empty(GW, GH, false, Image.FORMAT_RGBF)
+	_ctex = ImageTexture.create_from_image(_cimg)
 	_mat.set_shader_parameter("height_tex", _tex)
+	_mat.set_shader_parameter("color_tex", _ctex)
+	addins = load("res://scripts/addins.gd").new()
+	addins.name = "Addins"
+	addins.slime = self
+	add_child(addins)
+	style = style
 	_layout()
 	reset()
 
@@ -88,7 +119,11 @@ func _layout() -> void:
 	_mat.set_shader_parameter("cell_px", _cell)
 
 
-## Fresh round mound in the middle of the table.
+func cell_size() -> Vector2:
+	return _cell
+
+
+## Fresh round mound of the selected colour in the middle of the table.
 func reset() -> void:
 	var c := Vector2(GW * 0.5, GH * 0.5)
 	var rx := mound_radius / _cell.x
@@ -99,13 +134,137 @@ func reset() -> void:
 			var dy := (y + 0.5 - c.y) / ry
 			var d2 := dx * dx + dy * dy
 			_h[y * GW + x] = pow(1.0 - d2, 0.55) * 0.95 if d2 < 1.0 else 0.0
+	for i in GW * GH:
+		_c[i * 3] = color.r
+		_c[i * 3 + 1] = color.g
+		_c[i * 3 + 2] = color.b
 	_mass0 = _sum(_h)
 	_fingers.clear()
 	_wobble = 1.0
+	if addins:
+		addins.clear()
+
+
+## Pour a drop of the selected colour onto the lump (adds a little slime too).
+func drop(col: Color) -> void:
+	color = col
+	var c := _centroid()
+	var r := drop_px / _cell.x
+	var r2 := r * r
+	var x0 := maxi(0, int(c.x - r))
+	var x1 := mini(GW - 1, int(c.x + r) + 1)
+	var y0 := maxi(0, int(c.y - r))
+	var y1 := mini(GH - 1, int(c.y + r) + 1)
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var dx := x + 0.5 - c.x
+			var dy := y + 0.5 - c.y
+			var d2 := dx * dx + dy * dy
+			if d2 < r2:
+				var w := 1.0 - d2 / r2
+				var i := y * GW + x
+				var blend := minf(1.0, w * 2.4)
+				_c[i * 3] = lerpf(_c[i * 3], col.r, blend)
+				_c[i * 3 + 1] = lerpf(_c[i * 3 + 1], col.g, blend)
+				_c[i * 3 + 2] = lerpf(_c[i * 3 + 2], col.b, blend)
+				_h[i] = minf(h_cap, _h[i] + 0.45 * w * w)
+	_mass0 = _sum(_h)
+	_wobble = 0.8
+
+
+## Press a cookie-cutter shape ("star" or "heart") into the lump: the inside is pushed
+## down and the displaced slime piles into a rim just outside the outline.
+func stamp(shape: String) -> void:
+	var poly := _shape_polygon(shape, stamp_px / _cell.x)
+	var c := _centroid()
+	var r := stamp_px / _cell.x
+	var x0 := maxi(0, int(c.x - r * 1.6))
+	var x1 := mini(GW - 1, int(c.x + r * 1.6) + 1)
+	var y0 := maxi(0, int(c.y - r * 1.6))
+	var y1 := mini(GH - 1, int(c.y + r * 1.6) + 1)
+	var removed := 0.0
+	var rim: Array = []   # [index, weight]
+	var rim_w := 0.0
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var q := Vector2(x + 0.5, y + 0.5) - c
+			var i := y * GW + x
+			var dist := _poly_distance(q, poly)
+			if Geometry2D.is_point_in_polygon(q, poly):
+				if _h[i] > 0.02:
+					var k := 0.55 if dist > 0.8 else 0.55 * dist / 0.8
+					var take := _h[i] * k
+					_h[i] -= take
+					removed += take
+			elif dist < 2.2:
+				var t := 1.0 - absf(dist - 1.0) / 1.2
+				if t > 0.0 and _h[i] > 0.01:
+					rim.append([i, t * t])
+					rim_w += t * t
+	if removed > 0.0 and rim_w > 0.0:
+		var per := removed / rim_w
+		for e in rim:
+			_h[e[0]] = minf(h_cap, _h[e[0]] + per * e[1])
+	_wobble = 0.5
+
+
+func _shape_polygon(shape: String, r: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	if shape == "heart":
+		for i in 40:
+			var t := TAU * i / 40.0
+			var x := 16.0 * pow(sin(t), 3.0)
+			var y := -(13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t))
+			pts.append(Vector2(x, y) / 16.0 * r)
+	else:
+		for i in 10:
+			var rr := r if i % 2 == 0 else r * 0.45
+			var a := -PI / 2.0 + TAU * i / 10.0
+			pts.append(Vector2(cos(a), sin(a)) * rr)
+	return pts
+
+
+static func _poly_distance(q: Vector2, poly: PackedVector2Array) -> float:
+	var best := 1e9
+	var n := poly.size()
+	for i in n:
+		var d := q.distance_to(Geometry2D.get_closest_point_to_segment(q, poly[i], poly[(i + 1) % n]))
+		if d < best:
+			best = d
+	return best
 
 
 func wobble(strength := 1.0) -> void:
 	_wobble = strength
+
+
+## Grid cells with at least `min_h` slime (for sprinkling add-ins).
+func slime_cells(min_h: float) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for y in range(0, GH, 2):
+		for x in range(0, GW, 2):
+			if _h[y * GW + x] > min_h:
+				out.append(Vector2(x, y))
+	return out
+
+
+func sample_height(fx: float, fy: float) -> float:
+	return _sample(fx, fy)
+
+
+func _centroid() -> Vector2:
+	var sx := 0.0
+	var sy := 0.0
+	var m := 0.0
+	for y in GH:
+		for x in GW:
+			var v := _h[y * GW + x]
+			sx += v * (x + 0.5)
+			sy += v * (y + 0.5)
+			m += v
+	if m < 0.001:
+		return Vector2(GW * 0.5, GH * 0.5)
+	return Vector2(sx / m, sy / m)
 
 
 # ---------------------------------------------------------------- input
@@ -120,7 +279,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var g := _to_grid(event.position)
 		if event.pressed:
 			var inside := _sample(g.x - 0.5, g.y - 0.5) > 0.05
-			_fingers[event.index] = {"pos": g, "prev": g, "ticks": 0}
+			_fingers[event.index] = {"pos": g, "prev": g, "still": 0, "held": false, "inside": inside}
 			touched.emit(inside)
 		elif _fingers.has(event.index):
 			var inside := _sample(g.x - 0.5, g.y - 0.5) > 0.05
@@ -134,22 +293,35 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ---------------------------------------------------------------- simulation
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	_tick += 1
+	_stretch_cd = maxf(0.0, _stretch_cd - delta)
 	var rf := finger_px / _cell.x
 	for f in _fingers.values():
 		var pos: Vector2 = f["pos"]
 		var v: Vector2 = pos - f["prev"]
 		f["prev"] = pos
-		f["ticks"] += 1
 		var speed := v.length()
+		var on_slime := _sample(pos.x - 0.5, pos.y - 0.5) > 0.05
 		if speed > 0.03:
 			_smear(pos, v, rf * 1.9)
-		# press: full strength when still, weaker while sweeping
+			addins.advect(pos, v * smear_strength, rf * 1.9)
+			f["still"] = 0
+			if speed > 0.9 and on_slime and _stretch_cd <= 0.0:
+				_stretch_cd = 0.4
+				stretched.emit()
+		else:
+			f["still"] += 1
+			if f["still"] == 20 and on_slime and not f["held"]:
+				f["held"] = true
+				held.emit()
 		var k := press_rate * (1.0 - 0.55 * clampf(speed / 1.5, 0.0, 1.0))
 		_press(pos, rf, k)
+		addins.push_out(pos, rf)
 	if _tick % 3 == 0:
 		_relax(slump * 3.0)
+	if _tick % 6 == 0:
+		_mix(mix_rate)
 	if _tick % 4 == 0:
 		var m := _sum(_h)
 		if m > 0.0001:
@@ -201,7 +373,7 @@ func _press(c: Vector2, r: float, k: float) -> void:
 					_h[i] = minf(h_cap, _h[i] + per * t * t)
 
 
-## Carry slime along the finger's motion (semi-Lagrangian smudge inside radius r).
+## Carry slime and its colour along the finger's motion (semi-Lagrangian smudge).
 func _smear(c: Vector2, v: Vector2, r: float) -> void:
 	var x0 := maxi(0, int(c.x - r))
 	var x1 := mini(GW - 1, int(c.x + r) + 1)
@@ -214,7 +386,11 @@ func _smear(c: Vector2, v: Vector2, r: float) -> void:
 	for y in range(my0, my1 + 1):
 		var row := y * GW
 		for x in range(mx0, mx1 + 1):
-			_tmp[row + x] = _h[row + x]
+			var i := row + x
+			_tmp[i] = _h[i]
+			_ctmp[i * 3] = _c[i * 3]
+			_ctmp[i * 3 + 1] = _c[i * 3 + 1]
+			_ctmp[i * 3 + 2] = _c[i * 3 + 2]
 	var r2 := r * r
 	var vs := v * smear_strength
 	for y in range(y0, y1 + 1):
@@ -226,7 +402,30 @@ func _smear(c: Vector2, v: Vector2, r: float) -> void:
 				continue
 			var w := 1.0 - d2 / r2
 			w = w * w * (3.0 - 2.0 * w)
-			_h[y * GW + x] = minf(h_cap, _sample_tmp(x - vs.x * w, y - vs.y * w))
+			var sx := clampf(x - vs.x * w, 0.0, GW - 1.001)
+			var sy := clampf(y - vs.y * w, 0.0, GH - 1.001)
+			var ix := int(sx)
+			var iy := int(sy)
+			var tx := sx - ix
+			var ty := sy - iy
+			var i0 := iy * GW + ix
+			var i1 := i0 + 1
+			var i2 := i0 + GW
+			var i3 := i2 + 1
+			var w0 := (1.0 - tx) * (1.0 - ty)
+			var w1 := tx * (1.0 - ty)
+			var w2 := (1.0 - tx) * ty
+			var w3 := tx * ty
+			var i := y * GW + x
+			_h[i] = minf(h_cap, _tmp[i0] * w0 + _tmp[i1] * w1 + _tmp[i2] * w2 + _tmp[i3] * w3)
+			# colour: weight by thickness so thin/empty cells don't bleed their stale colour
+			var hw0 := w0 * (_tmp[i0] + 0.02)
+			var hw1 := w1 * (_tmp[i1] + 0.02)
+			var hw2 := w2 * (_tmp[i2] + 0.02)
+			var hw3 := w3 * (_tmp[i3] + 0.02)
+			var hs := hw0 + hw1 + hw2 + hw3
+			for ch in 3:
+				_c[i * 3 + ch] = (_ctmp[i0 * 3 + ch] * hw0 + _ctmp[i1 * 3 + ch] * hw1 + _ctmp[i2 * 3 + ch] * hw2 + _ctmp[i3 * 3 + ch] * hw3) / hs
 
 
 ## Slow flow: sharp shapes soften over time.
@@ -243,17 +442,22 @@ func _relax(d: float) -> void:
 			_h[i] = maxf(0.0, c + d * lap)
 
 
-func _sample_tmp(fx: float, fy: float) -> float:
-	fx = clampf(fx, 0.0, GW - 1.001)
-	fy = clampf(fy, 0.0, GH - 1.001)
-	var x := int(fx)
-	var y := int(fy)
-	var tx := fx - x
-	var ty := fy - y
-	var i := y * GW + x
-	var a := _tmp[i] + (_tmp[i + 1] - _tmp[i]) * tx
-	var b := _tmp[i + GW] + (_tmp[i + GW + 1] - _tmp[i + GW]) * tx
-	return a + (b - a) * ty
+## Colours blend into their neighbours where there is slime (kneading mixes them).
+func _mix(d: float) -> void:
+	var n := GW * GH * 3
+	for i in n:
+		_ctmp[i] = _c[i]
+	for y in range(1, GH - 1):
+		var row := y * GW
+		for x in range(1, GW - 1):
+			var i := row + x
+			if _h[i] < 0.03:
+				continue
+			var b := i * 3
+			for ch in 3:
+				var c := _ctmp[b + ch]
+				var lap := _ctmp[b - 3 + ch] + _ctmp[b + 3 + ch] + _ctmp[b - GW * 3 + ch] + _ctmp[b + GW * 3 + ch] - 4.0 * c
+				_c[b + ch] = c + d * lap
 
 
 func _sample(fx: float, fy: float) -> float:
@@ -283,5 +487,7 @@ func _process(delta: float) -> void:
 	_wobble = maxf(0.0, _wobble - delta * 1.6)
 	_img.set_data(GW, GH, false, Image.FORMAT_RF, _h.to_byte_array())
 	_tex.update(_img)
+	_cimg.set_data(GW, GH, false, Image.FORMAT_RGBF, _c.to_byte_array())
+	_ctex.update(_cimg)
 	_mat.set_shader_parameter("time", _time)
 	_mat.set_shader_parameter("wobble", _wobble)

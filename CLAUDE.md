@@ -30,6 +30,12 @@ uploaded as a FORMAT_RF texture and `game/shaders/slime.gdshader` reconstructs i
 B-spline (16 texelFetch, no float-filtering dependency) and lights it. Feel knobs are the
 `@export`s at the top of slime.gd: `press_rate`, `smear_strength`, `slump`, `finger_px`.
 
+Colour lives in a second interleaved RGB float array `_c` (FORMAT_RGBF texture), advected
+with the slime in `_smear` (thickness-weighted) and blended by `_mix`. `drop()` pours a colour
+at the centroid; `stamp()` presses a star/heart polygon in. `scripts/addins.gd` holds beads and
+stars that `advect`/`push_out` with the fingers. Styles are shader-uniform sets in
+`Slime.STYLES`. UI buttons are drawn in code (`ui.gd` IconControl) — no image assets, no text.
+
 ## Rules
 - No internet permission, no analytics, no ads, no text in the UI (kids may not read).
 - `minSdk` 30 (Fire OS 8), `targetSdk` 36 (Google Play requirement from 2026-08-31).

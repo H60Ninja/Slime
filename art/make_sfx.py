@@ -54,6 +54,37 @@ def slurp(seed):
     e = [math.sin(math.pi * i / n) ** 1.5 for i in range(n)]
     return [wet[i] * e[i] for i in range(n)]
 
+def squelch(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.38)
+    noise = [rnd.uniform(-1, 1) for _ in range(n)]
+    wet = lowpass(noise, lambda i: 900 - 500 * (i / n))
+    e = [math.sin(math.pi * min(1.0, i / (n * 0.9))) ** 2.2 * (1 + 0.35 * math.sin(2 * math.pi * 11 * i / SR)) for i in range(n)]
+    thump = [0.5 * math.sin(2 * math.pi * (70 - 25 * i / n) * i / SR) for i in range(n)]
+    return [(wet[i] * 1.3 + thump[i]) * e[i] for i in range(n)]
+
+def stretch(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.42)
+    noise = [rnd.uniform(-1, 1) for _ in range(n)]
+    wet = lowpass(noise, lambda i: 500 + 2600 * (i / n) ** 1.5)
+    e = [math.sin(math.pi * i / n) ** 1.2 for i in range(n)]
+    # rising wet tone underneath
+    tone = [0.35 * math.sin(2 * math.pi * (220 + 380 * (i / n) ** 2) * i / SR) for i in range(n)]
+    return [(wet[i] + tone[i]) * e[i] for i in range(n)]
+
+def sprinkle(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.45)
+    out = [0.0] * n
+    t = 0
+    while t < n - 400:
+        f = rnd.uniform(1800, 3600)
+        for k in range(400):
+            out[t + k] += math.sin(2 * math.pi * f * k / SR) * (1 - k / 400) ** 3 * 0.8
+        t += rnd.randint(500, 1600)
+    return out
+
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "game/assets/sfx"
     os.makedirs(out, exist_ok=True)
@@ -61,3 +92,6 @@ if __name__ == "__main__":
         write(os.path.join(out, f"squish{k}.wav"), squish(10 + k))
     write(os.path.join(out, "pop.wav"), pop(1))
     write(os.path.join(out, "slurp.wav"), slurp(2))
+    write(os.path.join(out, "squelch.wav"), squelch(3))
+    write(os.path.join(out, "stretch.wav"), stretch(4))
+    write(os.path.join(out, "sprinkle.wav"), sprinkle(5))

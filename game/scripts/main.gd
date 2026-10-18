@@ -10,6 +10,9 @@ var ui: CanvasLayer
 var _squish: Array[AudioStreamPlayer] = []
 var _pop: AudioStreamPlayer
 var _slurp: AudioStreamPlayer
+var _squelch: AudioStreamPlayer
+var _stretch: AudioStreamPlayer
+var _sprinkle: AudioStreamPlayer
 var _fps_timer := 0.0
 
 
@@ -25,15 +28,23 @@ func _ready() -> void:
 	add_child(ui)
 
 	ui.color_picked.connect(_on_color)
-	ui.sparkle_toggled.connect(func(on: bool): slime.sparkle = on; _save())
+	ui.style_picked.connect(func(s: String): slime.style = s; slime.wobble(0.6); _play(_squish.pick_random()); _save())
+	ui.sparkle_toggled.connect(func(on: bool): slime.sparkle = on; _play(_pop); _save())
 	ui.reset_pressed.connect(func(): slime.reset(); _play(_slurp))
+	ui.addin_pressed.connect(func(kind: int): slime.addins.sprinkle(kind, 10); _play(_sprinkle))
+	ui.stamp_pressed.connect(func(shape: String): slime.stamp(shape); _play(_squelch))
 	slime.touched.connect(func(inside: bool): if inside: _play(_squish.pick_random()))
-	slime.released.connect(func(inside: bool): if inside: _play(_pop))
+	slime.released.connect(func(inside: bool): if inside: _play(_pop); slime.wobble(0.3))
+	slime.stretched.connect(func(): _play(_stretch))
+	slime.held.connect(func(): _play(_squelch))
 
 	for k in 3:
 		_squish.append(_player("res://assets/sfx/squish%d.wav" % k))
 	_pop = _player("res://assets/sfx/pop.wav", -6.0)
 	_slurp = _player("res://assets/sfx/slurp.wav")
+	_squelch = _player("res://assets/sfx/squelch.wav", -3.0)
+	_stretch = _player("res://assets/sfx/stretch.wav", -4.0)
+	_sprinkle = _player("res://assets/sfx/sprinkle.wav", -2.0)
 
 	_load()
 	get_tree().root.size_changed.connect(_layout)
@@ -84,9 +95,8 @@ func _play(p: AudioStreamPlayer) -> void:
 
 
 func _on_color(c: Color) -> void:
-	slime.color = c
-	slime.wobble(1.0)
-	_play(_squish.pick_random())
+	slime.drop(c)
+	_play(_slurp)
 	_save()
 
 
@@ -94,6 +104,7 @@ func _save() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("slime", "color", slime.color)
 	cf.set_value("slime", "sparkle", slime.sparkle)
+	cf.set_value("slime", "style", slime.style)
 	cf.save(SETTINGS)
 
 
@@ -103,8 +114,9 @@ func _load() -> void:
 		return
 	slime.color = cf.get_value("slime", "color", slime.color)
 	slime.sparkle = cf.get_value("slime", "sparkle", false)
-	ui.select_color(slime.color)
-	ui.set_sparkle(slime.sparkle)
+	slime.style = cf.get_value("slime", "style", "shiny")
+	slime.reset()
+	ui.set_state(slime.color, slime.style, slime.sparkle)
 
 
 func _process(delta: float) -> void:

@@ -11,15 +11,17 @@ Squish, stretch and poke colourful slime with your fingers. No ads, no internet.
 ## Full description
 Slime is a calm, simple toy for little hands.
 
-Pick a colour, then mold: press to make craters, drag to pull out strands and spread it
-thin, pinch to pile up ridges and peaks, and smooth it all flat again. The slime keeps
-the shape you give it and slowly relaxes, like the real thing. Tap the star for sparkly
-slime, tap plus for a fresh lump.
+Mold it: press to make craters, drag to pull out strands and spread it thin, pinch to
+pile up ridges and peaks, smooth it flat again. Pour in a second colour and swirl it into
+marble. Stamp a star or a heart. Sprinkle beads. The slime keeps the shape you give it and
+slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like.
 
-- 10 bright colours
-- Sparkle mode
 - Real molding physics: craters, strands, ridges, peaks — it keeps your shape
-- Gentle squish and pop sounds
+- 10 bright colours: pour drops in and swirl them into marble
+- Four slime types: shiny, clear, metallic, cloud — plus sparkle
+- Sprinkle in beads and stars that ride along with the slime
+- Star and heart cookie-cutter stamps
+- Wet squish, stretch, squelch and pop sounds
 - No text to read, no menus to get lost in
 - No ads, no in-app purchases, no internet, no data collection
 
