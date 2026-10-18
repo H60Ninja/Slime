@@ -3,7 +3,7 @@ class_name SlimeUI
 ## Icon-only controls. Right: colour dots (tap = pour a drop of that colour).
 ## Bottom-left: new lump, four slime styles, sparkle toggle, beads, stars. No text.
 
-signal color_picked(c: Color)
+signal color_picked(c: Color, from: Vector2)
 signal style_picked(style: String)
 signal sparkle_toggled(on: bool)
 signal addin_pressed(kind: int)
@@ -157,7 +157,7 @@ func set_state(c: Color, style: String, sparkle: bool) -> void:
 func _on_color(i: int) -> void:
 	_selected = i
 	_refresh_selection()
-	color_picked.emit(PALETTE[i])
+	color_picked.emit(PALETTE[i], _buttons[i].global_position + _buttons[i].size * 0.5)
 
 
 func _on_style(i: int) -> void:

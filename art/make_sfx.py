@@ -85,6 +85,13 @@ def sprinkle(seed):
         t += rnd.randint(500, 1600)
     return out
 
+def bubble(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.07)
+    f0 = rnd.uniform(900, 1700)
+    e = env(n, SR * 0.001, 2.5)
+    return [math.sin(2 * math.pi * (f0 + 600 * (i / n)) * i / SR) * e[i] for i in range(n)]
+
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "game/assets/sfx"
     os.makedirs(out, exist_ok=True)
@@ -95,3 +102,5 @@ if __name__ == "__main__":
     write(os.path.join(out, "squelch.wav"), squelch(3))
     write(os.path.join(out, "stretch.wav"), stretch(4))
     write(os.path.join(out, "sprinkle.wav"), sprinkle(5))
+    for k in range(3):
+        write(os.path.join(out, f"bubble{k}.wav"), bubble(20 + k))

@@ -4,6 +4,7 @@ extends Node2D
 const SETTINGS := "user://settings.cfg"
 const SlimeScript := preload("res://scripts/slime.gd")
 const UIScript := preload("res://scripts/ui.gd")
+const PourScript := preload("res://scripts/pour.gd")
 
 var slime: Node2D
 var ui: CanvasLayer
@@ -13,6 +14,7 @@ var _slurp: AudioStreamPlayer
 var _squelch: AudioStreamPlayer
 var _stretch: AudioStreamPlayer
 var _sprinkle: AudioStreamPlayer
+var _bubble: Array[AudioStreamPlayer] = []
 var _fps_timer := 0.0
 
 
@@ -37,6 +39,7 @@ func _ready() -> void:
 	slime.released.connect(func(inside: bool): if inside: _play(_pop); slime.wobble(0.3))
 	slime.stretched.connect(func(): _play(_stretch))
 	slime.held.connect(func(): _play(_squelch))
+	slime.bubbles.popped.connect(func(): _play(_bubble.pick_random()))
 
 	for k in 3:
 		_squish.append(_player("res://assets/sfx/squish%d.wav" % k))
@@ -45,6 +48,8 @@ func _ready() -> void:
 	_squelch = _player("res://assets/sfx/squelch.wav", -3.0)
 	_stretch = _player("res://assets/sfx/stretch.wav", -4.0)
 	_sprinkle = _player("res://assets/sfx/sprinkle.wav", -2.0)
+	for k in 3:
+		_bubble.append(_player("res://assets/sfx/bubble%d.wav" % k, -8.0))
 
 	_load()
 	get_tree().root.size_changed.connect(_layout)
@@ -94,10 +99,15 @@ func _play(p: AudioStreamPlayer) -> void:
 	p.play()
 
 
-func _on_color(c: Color) -> void:
-	slime.drop(c)
-	_play(_slurp)
-	_save()
+func _on_color(c: Color, from: Vector2) -> void:
+	var pour := PourScript.new()
+	pour.color = c
+	pour.start = from
+	pour.target = slime.drop_target()
+	pour.position = from
+	pour.landed.connect(func(col: Color, _at: Vector2): slime.drop(col); _play(_slurp); _save())
+	add_child(pour)
+	_play(_pop)
 
 
 func _save() -> void:

@@ -2,7 +2,8 @@
 
 A touch slime toy for little kids on Android tablets (Fire tablets and Google Kids
 Space tablets). A lump of slime on a table: press craters into it, drag it into strands,
-pinch up ridges, pour in colours and swirl them together, stamp stars and hearts, sprinkle
+pinch up ridges, pour in colours (they fall from the palette and splash) and swirl them
+together, pop the bubbles that rise under your finger, stamp stars and hearts, sprinkle
 beads and stars, switch between shiny, clear, metallic and cloud slime. No text, no ads,
 no internet.
 

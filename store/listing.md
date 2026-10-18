@@ -21,7 +21,8 @@ slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like
 - Four slime types: shiny, clear, metallic, cloud — plus sparkle
 - Sprinkle in beads and stars that ride along with the slime
 - Star and heart cookie-cutter stamps
-- Wet squish, stretch, squelch and pop sounds
+- Bubbles rise under a held finger and pop when you sweep through them
+- Wet squish, stretch, squelch, bubble and pop sounds
 - No text to read, no menus to get lost in
 - No ads, no in-app purchases, no internet, no data collection
 

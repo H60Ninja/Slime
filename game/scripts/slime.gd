@@ -49,6 +49,7 @@ var style := "shiny":
 				_mat.set_shader_parameter(k, STYLES[v][k])
 
 var addins: Node2D
+var bubbles: Node2D
 
 var _h := PackedFloat32Array()
 var _tmp := PackedFloat32Array()
@@ -105,6 +106,10 @@ func _ready() -> void:
 	addins.name = "Addins"
 	addins.slime = self
 	add_child(addins)
+	bubbles = load("res://scripts/bubbles.gd").new()
+	bubbles.name = "Bubbles"
+	bubbles.slime = self
+	add_child(bubbles)
 	style = style
 	_layout()
 	reset()
@@ -121,6 +126,22 @@ func _layout() -> void:
 
 func cell_size() -> Vector2:
 	return _cell
+
+
+## Local pixel position -> grid coordinates.
+func to_grid_px(p: Vector2) -> Vector2:
+	var q := p - play_area.position
+	return Vector2(q.x / _cell.x, q.y / _cell.y)
+
+
+## Grid coordinates -> local pixel position.
+func to_px(g: Vector2) -> Vector2:
+	return play_area.position + Vector2(g.x * _cell.x, g.y * _cell.y)
+
+
+## Where a poured drop should land (local px).
+func drop_target() -> Vector2:
+	return to_px(_centroid())
 
 
 ## Fresh round mound of the selected colour in the middle of the table.
@@ -143,6 +164,8 @@ func reset() -> void:
 	_wobble = 1.0
 	if addins:
 		addins.clear()
+	if bubbles:
+		bubbles.clear()
 
 
 ## Pour a drop of the selected colour onto the lump (adds a little slime too).
@@ -306,6 +329,9 @@ func _physics_process(delta: float) -> void:
 		if speed > 0.03:
 			_smear(pos, v, rf * 1.9)
 			addins.advect(pos, v * smear_strength, rf * 1.9)
+			bubbles.pop_near(to_px(pos), finger_px * 1.1)
+			if on_slime and speed > 0.5 and _tick % 10 == 0:
+				bubbles.spawn(to_px(pos - v.normalized() * rf * 1.5))
 			f["still"] = 0
 			if speed > 0.9 and on_slime and _stretch_cd <= 0.0:
 				_stretch_cd = 0.4
@@ -315,6 +341,8 @@ func _physics_process(delta: float) -> void:
 			if f["still"] == 20 and on_slime and not f["held"]:
 				f["held"] = true
 				held.emit()
+			if on_slime and f["still"] >= 8 and f["still"] % 10 == 0:
+				bubbles.spawn(to_px(pos) + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * finger_px * 1.6)
 		var k := press_rate * (1.0 - 0.55 * clampf(speed / 1.5, 0.0, 1.0))
 		_press(pos, rf, k)
 		addins.push_out(pos, rf)
