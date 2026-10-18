@@ -4,3 +4,4 @@ game/.godot/
 !debug.keystore
 local.env
 .DS_Store
+game/android/

@@ -1,5 +1,21 @@
 # Slime — Project Plan (creation to shipping)
 
+## Status (updated 2026-10-17 evening)
+
+| Phase | State |
+|---|---|
+| 0 Toolchain | ✅ done — emulator, two AVDs, Godot 4.7.2 + templates, debug + release keystores |
+| 1 Skeleton | ✅ done — repo, Makefile, presets, CLAUDE.md |
+| 2 Slime | ✅ playable — soft body, multi-touch poke/smear/push, dents, sounds, haptic; verified on API 30 + API 36 emulators at 60 fps (API 30) |
+| 3 Colours | ✅ v1 — 10 colours, sparkle, new-slime, settings persist |
+| 4 Polish | ✅ v1 — icon, landscape lock, immersive, privacy page, store screenshots. **Not yet tested on a real Fire tablet** |
+| 5 Amazon | ⏳ ready to submit: `build/slime-release.apk` (release-signed, targetSdk 36). Needs Adam's Amazon developer account |
+| 6 Google | ⏳ ready to upload: `build/slime-release.aab`. Needs Adam's Play account + 12 testers |
+| 7 Maint. | — |
+
+See `store/listing.md` for the exact submission steps and listing text.
+
+
 Written 2026-10-17. A touch slime toy for Adam's kids on Fire tablets (Amazon Kids) and
 Android tablets running Google Kids Space. Pick a colour, then squish, stretch and poke the
 slime with a finger.

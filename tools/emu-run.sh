@@ -4,7 +4,7 @@
 set -u
 ANDROID_HOME=${ANDROID_HOME:-$HOME/Library/Android/sdk}
 ADB="$ANDROID_HOME/platform-tools/adb"
-T=${1:--e}
+T="${@:--e}"
 APK="$(cd "$(dirname "$0")/.." && pwd)/build/slime-debug.apk"
 PKG=com.h60ninja.slime
 for i in $(seq 1 30); do
