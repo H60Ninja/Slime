@@ -29,12 +29,12 @@ var _sparkle := false
 func _ready() -> void:
 	var col := VBoxContainer.new()
 	col.name = "Palette"
-	col.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+	add_child(col)
+	col.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
 	col.offset_right = -24
 	col.offset_left = -24 - DOT
 	col.add_theme_constant_override("separation", 14)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	add_child(col)
 	for i in PALETTE.size():
 		var b := _round_button(PALETTE[i])
 		b.pressed.connect(_on_color.bind(i))
@@ -44,12 +44,12 @@ func _ready() -> void:
 
 	var row := HBoxContainer.new()
 	row.name = "Tools"
+	add_child(row)
 	row.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	row.offset_left = 24
 	row.offset_bottom = -24
 	row.offset_top = -24 - DOT
 	row.add_theme_constant_override("separation", 18)
-	add_child(row)
 
 	var spark := _round_button(Color("ffffff"), Color("ffd84d"))
 	spark.add_child(_icon(IconKind.STAR))
@@ -92,10 +92,23 @@ func _refresh_selection() -> void:
 		_buttons[i].add_theme_stylebox_override("hover", _dot_style(PALETTE[i], Color.WHITE, w))
 
 
+## Move the selection ring to the palette entry matching c (no signal).
+func select_color(c: Color) -> void:
+	for i in PALETTE.size():
+		if PALETTE[i].is_equal_approx(c):
+			_selected = i
+	_refresh_selection()
+
+
 func _on_color(i: int) -> void:
 	_selected = i
 	_refresh_selection()
 	color_picked.emit(PALETTE[i])
+
+
+## Sync the toggle with a loaded setting (no signal).
+func set_sparkle(on: bool) -> void:
+	_sparkle = on
 
 
 func _on_sparkle() -> void:

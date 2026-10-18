@@ -28,7 +28,7 @@ emu-kids:           ## boot the Google Kids Space class emulator (API 36)
 
 install:            ## install + launch on whatever device/emulator adb sees
 	$(ADB) install -r $(APK)
-	$(ADB) shell monkey -p $(PKG) -c android.intent.category.LAUNCHER 1 >/dev/null
+	$(ADB) shell am start -n $(PKG)/com.godot.game.GodotAppLauncher >/dev/null
 
 run-fire: export-apk install   ## export, install and launch on the running emulator
 run-device: export-apk install ## same, on a USB-connected tablet (enable ADB on it first)

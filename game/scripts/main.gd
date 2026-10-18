@@ -2,9 +2,11 @@ extends Node2D
 ## Root scene: table background, the slime, the icon UI, sounds.
 
 const SETTINGS := "user://settings.cfg"
+const SlimeScript := preload("res://scripts/slime.gd")
+const UIScript := preload("res://scripts/ui.gd")
 
-var slime: Slime
-var ui: SlimeUI
+var slime: Node2D
+var ui: CanvasLayer
 var _squish: Array[AudioStreamPlayer] = []
 var _pop: AudioStreamPlayer
 var _slurp: AudioStreamPlayer
@@ -14,11 +16,11 @@ var _fps_timer := 0.0
 func _ready() -> void:
 	_build_background()
 
-	slime = Slime.new()
+	slime = SlimeScript.new()
 	slime.name = "Slime"
 	add_child(slime)
 
-	ui = SlimeUI.new()
+	ui = UIScript.new()
 	ui.name = "UI"
 	add_child(ui)
 
@@ -49,13 +51,17 @@ func _build_background() -> void:
 	t.fill_to = Vector2(0.5, 1.1)
 	t.width = 64
 	t.height = 64
+	var layer := CanvasLayer.new()
+	layer.name = "BackgroundLayer"
+	layer.layer = -1
+	add_child(layer)
 	var bg := TextureRect.new()
 	bg.name = "Background"
 	bg.texture = t
 	bg.stretch_mode = TextureRect.STRETCH_SCALE
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	layer.add_child(bg)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 func _layout() -> void:
@@ -97,6 +103,8 @@ func _load() -> void:
 		return
 	slime.color = cf.get_value("slime", "color", slime.color)
 	slime.sparkle = cf.get_value("slime", "sparkle", false)
+	ui.select_color(slime.color)
+	ui.set_sparkle(slime.sparkle)
 
 
 func _process(delta: float) -> void:

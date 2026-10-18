@@ -15,12 +15,14 @@ const ITERS := 3
 
 @export var radius := 250.0
 @export var damping := 0.975          ## velocity kept per sub-step
-@export var heal := 0.010             ## pull toward the rest circle per sub-step (shape memory)
+@export var slide_friction := 0.05    ## extra damping of the whole-blob (sliding) velocity per sub-step
+@export var heal := 0.004             ## pull toward the rest shape per sub-step
+@export var memory := 0.0015          ## how fast the rest shape adopts what the kid molded
 @export var area_k := 0.55            ## how hard the blob keeps its area (bulges when squeezed)
 @export var edge_k := 0.85
 @export var bend_k := 0.35
 @export var finger_radius := 48.0     ## size of a finger that pushes the edge from outside
-@export var smear_radius := 240.0     ## reach of a finger dragging from inside
+@export var smear_radius := 170.0     ## reach of a finger dragging from inside
 @export var play_area := Rect2(80, 80, 1660, 1040)  ## points are clamped inside this (canvas coords)
 
 var color: Color = Color("6fe36a"):
@@ -48,7 +50,7 @@ var _inner: Polygon2D
 var _highlight: Polygon2D
 var _spec: Polygon2D
 var _dents: Node2D
-var _glitter: Sprite2D
+var _glitter: Polygon2D
 var _dent_tex: GradientTexture2D
 
 
@@ -65,7 +67,7 @@ func _build_nodes() -> void:
 
 	_body = Polygon2D.new()
 	_body.name = "Body"
-	_body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	_body.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	add_child(_body)
 
 	_inner = Polygon2D.new()
@@ -98,29 +100,28 @@ func _build_nodes() -> void:
 
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_CELLULAR
-	noise.frequency = 0.08
+	noise.frequency = 0.05
 	noise.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
 	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.08, 0.14, 1.0])
-	ramp.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.8), Color(1, 1, 1, 0), Color(1, 1, 1, 0)])
+	ramp.offsets = PackedFloat32Array([0.0, 0.14, 0.24, 1.0])
+	ramp.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.9), Color(1, 1, 1, 0), Color(1, 1, 1, 0)])
 	var ntex := NoiseTexture2D.new()
 	ntex.noise = noise
 	ntex.color_ramp = ramp
 	ntex.width = 256
 	ntex.height = 256
 	ntex.seamless = true
-	_glitter = Sprite2D.new()
+	_glitter = Polygon2D.new()
 	_glitter.name = "Glitter"
 	_glitter.texture = ntex
-	_glitter.region_enabled = true
-	_glitter.region_rect = Rect2(0, 0, 1024, 1024)
 	_glitter.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	_glitter.texture_scale = Vector2(0.6, 0.6)
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	_glitter.material = mat
-	_glitter.modulate = Color(1, 1, 1, 0.8)
+	_glitter.modulate = Color(1, 1, 1, 0.9)
 	_glitter.visible = sparkle
-	_body.add_child(_glitter)
+	add_child(_glitter)
 
 	_apply_colors()
 
@@ -171,6 +172,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var f := {"pos": pos, "prev": pos, "inside": inside, "dent": null, "trail": pos}
 			if inside:
 				f["dent"] = _spawn_dent(pos)
+				Input.vibrate_handheld(18)
 			_fingers[event.index] = f
 			touched.emit(inside)
 		else:
@@ -231,14 +233,18 @@ func _physics_process(_delta: float) -> void:
 
 
 func _integrate() -> void:
+	var mean := Vector2.ZERO
 	for i in N:
-		var v := (_p[i] - _pp[i]) * damping
+		mean += _p[i] - _pp[i]
+	mean = mean / N * slide_friction
+	for i in N:
+		var v := (_p[i] - _pp[i]) * damping - mean
 		_pp[i] = _p[i]
 		_p[i] += v
 
 
 func _apply_finger(f: Dictionary) -> void:
-	var fp: Vector2 = f["prev"] + f["step"] * SUBSTEPS if false else f["pos"]
+	var fp: Vector2 = f["pos"]
 	if f["inside"]:
 		var step: Vector2 = f["step"]
 		if step == Vector2.ZERO:
@@ -297,6 +303,7 @@ func _solve_shape() -> void:
 	var c := _centroid(_p)
 	for i in N:
 		_p[i] += (c + _rest[i] - _p[i]) * heal
+		_rest[i] = _rest[i].lerp(_p[i] - c, memory)
 
 
 func _solve_bounds() -> void:
@@ -335,10 +342,12 @@ func _process(delta: float) -> void:
 	var bb := _bounds(outline)
 	var spec_c := Vector2(lerpf(bb.position.x, bb.end.x, 0.32), lerpf(bb.position.y, bb.end.y, 0.28))
 	_spec.polygon = _ellipse(spec_c, Vector2(bb.size.x * 0.11, bb.size.y * 0.06), -0.5)
+	_shadow.position = Vector2(10, 16)
 	if sparkle:
-		_glitter.position = c
-		_glitter.region_rect.position = Vector2(sin(_time * 0.7) * 40.0, cos(_time * 0.9) * 40.0)
-		_glitter.modulate.a = 0.55 + 0.35 * sin(_time * 3.0)
+		_glitter.polygon = outline
+		_glitter.uv = outline
+		_glitter.texture_offset = Vector2(sin(_time * 0.7) * 40.0, cos(_time * 0.9) * 40.0)
+		_glitter.modulate.a = 0.6 + 0.3 * sin(_time * 3.0)
 
 
 static func _chaikin(pts: PackedVector2Array) -> PackedVector2Array:
