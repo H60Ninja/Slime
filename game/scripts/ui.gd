@@ -10,6 +10,8 @@ signal addin_pressed(kind: int)
 signal stamp_pressed(shape: String)
 signal reset_pressed
 signal snapshot_pressed
+signal knife_toggled(on: bool)
+signal jars_pressed
 
 const PALETTE: Array[Color] = [
 	Color("6fe36a"),  # lime
@@ -23,11 +25,11 @@ const PALETTE: Array[Color] = [
 	Color("f4f4ff"),  # cloud
 	Color("2c2c5e"),  # galaxy
 ]
-const STYLES := ["shiny", "clear", "metal", "cloud", "crunchy", "butter", "fluffy"]
+const STYLES := ["shiny", "clear", "metal", "cloud", "crunchy", "butter", "fluffy", "glow", "holo", "magic"]
 const DOT := 88.0
 
-enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART, CRUNCHY, BUTTER, FLUFFY, CAMERA }
-const STYLE_ICONS := [Icon.SHINY, Icon.CLEAR, Icon.METAL, Icon.CLOUD, Icon.CRUNCHY, Icon.BUTTER, Icon.FLUFFY]
+enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART, CRUNCHY, BUTTER, FLUFFY, CAMERA, GLOW, HOLO, MAGIC, KNIFE, JARS }
+const STYLE_ICONS := [Icon.SHINY, Icon.CLEAR, Icon.METAL, Icon.CLOUD, Icon.CRUNCHY, Icon.BUTTER, Icon.FLUFFY, Icon.GLOW, Icon.HOLO, Icon.MAGIC]
 
 var _buttons: Array[Button] = []
 var _style_buttons: Array[Button] = []
@@ -35,6 +37,8 @@ var _selected := 0
 var _style := 0
 var _sparkle := false
 var _spark_btn: Button
+var _knife_btn: Button
+var _knife := false
 var _pulse_target: Control = null
 var _pulse_t := 0.0
 var _pulse: PulseRing
@@ -61,7 +65,7 @@ func _ready() -> void:
 	left.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
 	left.offset_left = 24
 	left.offset_right = 24 + DOT
-	left.add_theme_constant_override("separation", 14)
+	left.add_theme_constant_override("separation", 10)
 	left.alignment = BoxContainer.ALIGNMENT_CENTER
 	for i in STYLES.size():
 		var b := _round_button(Color.WHITE)
@@ -78,7 +82,7 @@ func _ready() -> void:
 	row.offset_right = -(24 + DOT + 30)
 	row.offset_bottom = -24
 	row.offset_top = -24 - DOT
-	row.add_theme_constant_override("separation", 16)
+	row.add_theme_constant_override("separation", 12)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var fresh := _round_button(Color.WHITE)
@@ -113,11 +117,20 @@ func _ready() -> void:
 	ht.pressed.connect(func(): stamp_pressed.emit("heart"))
 	row.add_child(ht)
 
+	_knife_btn = _round_button(Color.WHITE)
+	_knife_btn.add_child(_icon(Icon.KNIFE))
+	_knife_btn.pressed.connect(_on_knife)
+	row.add_child(_knife_btn)
+
 	row.add_child(_spacer())
 	var cam := _round_button(Color.WHITE)
 	cam.add_child(_icon(Icon.CAMERA))
 	cam.pressed.connect(func(): snapshot_pressed.emit())
 	row.add_child(cam)
+	var jars := _round_button(Color.WHITE)
+	jars.add_child(_icon(Icon.JARS))
+	jars.pressed.connect(func(): jars_pressed.emit())
+	row.add_child(jars)
 
 	_pulse = PulseRing.new()
 	_pulse.visible = false
@@ -185,6 +198,7 @@ func _refresh_selection() -> void:
 	for i in _style_buttons.size():
 		_set_ring(_style_buttons[i], Color.WHITE, i == _style, Color("4fb8ff"))
 	_set_ring(_spark_btn, Color.WHITE, _sparkle, Color("ffd84d"))
+	_set_ring(_knife_btn, Color.WHITE, _knife, Color("ff6b6b"))
 
 
 ## Sync with loaded settings (no signals).
@@ -207,6 +221,17 @@ func _on_style(i: int) -> void:
 	_style = i
 	_refresh_selection()
 	style_picked.emit(STYLES[i])
+
+
+func set_knife(on: bool) -> void:
+	_knife = on
+	_refresh_selection()
+
+
+func _on_knife() -> void:
+	_knife = not _knife
+	_refresh_selection()
+	knife_toggled.emit(_knife)
 
 
 func _on_sparkle() -> void:
@@ -308,6 +333,33 @@ class IconControl extends Control:
 				draw_circle(c + Vector2(15, 7), 11, pc)
 				draw_rect(Rect2(c + Vector2(-12, 6), Vector2(27, 12)), pc)
 				draw_circle(c + Vector2(-2, -10), 5, Color(1, 1, 1, 0.8))
+			14:  # GLOW: moon-lit blob
+				draw_circle(c, 26, Color("1d2140"))
+				draw_circle(c, 17, Color("b9ff7a"))
+				draw_circle(c, 11, Color("e9ffc4"))
+			15:  # HOLO: rainbow diamond
+				var cols := [Color("ff6b6b"), Color("ffd84d"), Color("6fe36a"), Color("4fb8ff"), Color("c58bff")]
+				for i in 5:
+					var y0 := -24.0 + i * 9.6
+					draw_rect(Rect2(c + Vector2(-22, y0), Vector2(44, 9.6)), cols[i])
+				draw_circle(c + Vector2(-9, -9), 5, Color(1, 1, 1, 0.8))
+			16:  # MAGIC: colour wheel
+				for i in 12:
+					var a0 := TAU * i / 12.0
+					var pts := PackedVector2Array([c])
+					for k in 4:
+						var a := a0 + TAU / 12.0 * k / 3.0
+						pts.append(c + Vector2(cos(a), sin(a)) * 25.0)
+					draw_colored_polygon(pts, Color.from_hsv(i / 12.0, 0.8, 1.0))
+				draw_circle(c, 8, Color.WHITE)
+			17:  # KNIFE
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-26, 10), c + Vector2(14, -22), c + Vector2(22, -14), c + Vector2(-12, 18)]), Color("d7dde8"))
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-26, 10), c + Vector2(-12, 18), c + Vector2(-20, 26), c + Vector2(-32, 18)]), Color("8a6a4a"))
+			18:  # JARS: a jar
+				draw_rect(Rect2(c + Vector2(-18, -10), Vector2(36, 34)), Color("cfe8ff"))
+				draw_rect(Rect2(c + Vector2(-14, -22), Vector2(28, 10)), Color("7a8699"))
+				draw_rect(Rect2(c + Vector2(-14, 2), Vector2(28, 18)), Color("ff8fcf"))
+				draw_circle(c + Vector2(-9, -2), 4, Color(1, 1, 1, 0.8))
 			13:  # CAMERA
 				var body := Rect2(c + Vector2(-26, -14), Vector2(52, 36))
 				draw_rect(body, Color("5a6478"))

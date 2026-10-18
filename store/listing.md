@@ -3,13 +3,16 @@
 Same text for both stores. Package `com.h60ninja.slime`, version 0.1.0 (versionCode 1).
 
 ## Title
-Slime
+Slime: No Ads Sensory Play
+
+(Amazon title field is longer; use "Slime — Squish, Mold & Mix. No Ads, No Purchases".)
 
 ## Short description (80 chars max)
-Squish, stretch and poke colourful slime with your fingers. No ads, no internet.
+Make, mold, mix and slice real slime. Calm sensory play. No ads, nothing to buy.
 
 ## Full description
-Slime is a calm, simple toy for little hands.
+Slime is a calm, simple toy for little hands. No ads. No purchases. No internet. Nothing
+to break and nothing to lose.
 
 Mold it: press to make craters, drag to pull out strands and spread it thin, pinch to
 pile up ridges and peaks, smooth it flat again. Pour in a second colour and swirl it into
@@ -18,18 +21,26 @@ slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like
 
 - Real molding physics: craters, strands, ridges, peaks — it keeps your shape
 - 10 bright colours: pour drops in and swirl them like real paint — yellow and blue make green
-- Seven slime kinds: shiny, clear, metallic, cloud, crunchy, butter, fluffy — plus sparkle
+- Ten slime kinds: shiny, clear, metallic, cloud, crunchy, butter, fluffy, glow-in-the-dark,
+  holographic and colour-changing magic slime — plus sparkle
+- Slice it with the knife and watch it heal
+- Keep up to six slimes in jars on the shelf and come back to them
 - Make your own slime first: pour the glue, pick a colour, add activator, stir it up
 - Camera button saves your creation to the tablet's Pictures to show a grown-up
 - Works in landscape and portrait
 - Sprinkle in beads and stars that sink in and ride along with the slime
 - Star and heart cookie-cutter stamps
 - Bubbles rise under a held finger and pop when you sweep through them
-- Wet squish, stretch, squelch, bubble and pop sounds
+- Wet squish, stretch, squelch, bubble, crackle and pop sounds that follow your hands
+- No timers, no scores, no pressure: good for quiet time, waiting rooms and sensory breaks
 - No text to read, no menus to get lost in
 - No ads, no in-app purchases, no internet, no data collection
 
 Made by a dad for his kids.
+
+## Keywords / tags (where the store asks)
+slime, sensory, no ads, kids, toddler, calm, fidget, ASMR, squishy, satisfying, molding,
+play dough, stress relief, autism friendly
 
 ## Category
 Amazon: Games > Kids (Age 3–5 / 6–8). Google: Casual (Family: Ages 5 & under, 6–8).
@@ -85,6 +96,7 @@ never be updated under this package name.
 5. Testers must opt in, install and open the app. After 14 consecutive days with 12+
    testers, Dashboard → "Apply for production access".
 6. Production → create release → same AAB (or a newer one) → review → publish.
-7. Optional: Grow → Teacher Approved opt-in.
+7. **Teacher Approved: opt in on day one** (Grow → Teacher Approved). The app is auto-queued
+   once it meets the Families policy; approved apps get the badge and Kids-tab placement.
 8. On the kids' tablet: Google Kids Space → Parent menu → Add more apps → Slime → approve
    (or approve the child's request from Family Link).

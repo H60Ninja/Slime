@@ -120,6 +120,57 @@ def click(seed):
         out.append((math.sin(2 * math.pi * 2400 * i / SR) + 0.5 * math.sin(2 * math.pi * 900 * i / SR)) * e)
     return out
 
+def wet_loop(seed):
+    """Seamless 1.0s wet/gooey loop; the game pitches and fades it with drag speed."""
+    rnd = random.Random(seed)
+    n = SR
+    noise = [rnd.uniform(-1, 1) for _ in range(n)]
+    # slowly wandering cutoff for a bubbling character
+    cut = [600 + 500 * math.sin(2 * math.pi * 1.7 * i / SR) + 300 * math.sin(2 * math.pi * 4.3 * i / SR + 1) for i in range(n)]
+    wet = lowpass(noise, lambda i: cut[i])
+    # random tiny pops riding on top
+    t = 0
+    while t < n - 200:
+        amp = rnd.uniform(0.2, 0.6)
+        for k in range(160):
+            wet[t + k] += math.sin(2 * math.pi * rnd.uniform(500, 1200) * k / SR) * amp * (1 - k / 160) ** 3
+        t += rnd.randint(1500, 5000)
+    # crossfade tail into head so it loops
+    f = int(SR * 0.08)
+    for i in range(f):
+        a = i / f
+        wet[i] = wet[i] * a + wet[n - f + i] * (1 - a)
+    return wet[: n - f]
+
+def slice_wet(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.28)
+    noise = [rnd.uniform(-1, 1) for _ in range(n)]
+    wet = lowpass(noise, lambda i: 2500 - 1800 * (i / n))
+    e = [(math.sin(math.pi * min(1.0, i / (n * 0.5))) ** 0.6) * (1 - i / n) ** 0.8 for i in range(n)]
+    return [wet[i] * e[i] for i in range(n)]
+
+def slice_crunch(seed):
+    rnd = random.Random(seed)
+    n = int(SR * 0.26)
+    out = [0.0] * n
+    t = 0
+    while t < n - 200:
+        amp = rnd.uniform(0.5, 1.0) * (1 - t / n)
+        for k in range(180):
+            out[t + k] += rnd.uniform(-1, 1) * amp * (1 - k / 180) ** 3
+        t += rnd.randint(120, 500)
+    return lowpass(out, lambda i: 6000)
+
+def jar_open(seed):
+    n = int(SR * 0.18)
+    out = []
+    for i in range(n):
+        e = (1 - i / n) ** 3
+        f = 900 + 1400 * (i / n)
+        out.append((math.sin(2 * math.pi * f * i / SR) * 0.7 + math.sin(2 * math.pi * 320 * i / SR) * 0.4) * e)
+    return out
+
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "game/assets/sfx"
     os.makedirs(out, exist_ok=True)
@@ -135,3 +186,7 @@ if __name__ == "__main__":
     write(os.path.join(out, "crackle.wav"), crackle(30))
     write(os.path.join(out, "poof.wav"), poof(31))
     write(os.path.join(out, "click.wav"), click(32))
+    write(os.path.join(out, "wet_loop.wav"), wet_loop(40))
+    write(os.path.join(out, "slice_wet.wav"), slice_wet(41))
+    write(os.path.join(out, "slice_crunch.wav"), slice_crunch(42))
+    write(os.path.join(out, "jar.wav"), jar_open(43))

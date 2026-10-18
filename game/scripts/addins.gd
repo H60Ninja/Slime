@@ -9,6 +9,20 @@ var slime: Node2D   # set by Slime
 var _items: Array = []  # {p: Vector2 (grid), kind: int, col: Color, rot: float, size: float}
 
 
+func get_state() -> Array:
+	var out := []
+	for it in _items:
+		out.append({"p": it["p"], "kind": it["kind"], "col": it["col"], "rot": it["rot"], "size": it["size"]})
+	return out
+
+
+func set_state(items: Array) -> void:
+	_items.clear()
+	for it in items:
+		_items.append({"p": it["p"], "kind": it["kind"], "col": it["col"], "rot": it["rot"], "size": it["size"]})
+	queue_redraw()
+
+
 func transpose() -> void:
 	for it in _items:
 		it["p"] = Vector2(it["p"].y, it["p"].x)

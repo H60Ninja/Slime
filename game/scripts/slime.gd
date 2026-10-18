@@ -9,10 +9,13 @@ signal touched(inside: bool)
 signal released(inside: bool)
 signal stretched          ## a fast drag through slime (sound hook)
 signal held               ## finger held still on slime for a moment (sound hook)
+signal style_changed(style: String)
+signal kneading(speed: float)   ## every physics tick: fastest finger speed on slime (0 when idle)
+signal sliced
 
 var GW := 80
 var GH := 52
-const UNIFORMS := ["spec_k", "spec_pow", "alpha_k", "clear_k", "metal", "matte", "crunch", "fluff", "thick_px"]
+const UNIFORMS := ["spec_k", "spec_pow", "alpha_k", "clear_k", "metal", "matte", "crunch", "fluff", "thick_px", "glow", "holo"]
 const STYLES := {
 	"shiny":   {"spec_k": 0.5,  "spec_pow": 70.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0},
 	"clear":   {"spec_k": 0.8,  "spec_pow": 90.0, "alpha_k": 0.68, "clear_k": 1.0, "metal": 0.0, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0},
@@ -24,6 +27,10 @@ const STYLES := {
 				"smear": 1.15, "slump": 3.0, "press": 1.3},
 	"fluffy":  {"spec_k": 0.2,  "spec_pow": 20.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.55, "crunch": 0.0, "fluff": 1.0, "thick_px": 330.0,
 				"smear": 0.8, "slump": 0.6, "press": 1.4},
+	"glow":    {"spec_k": 0.6,  "spec_pow": 60.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0, "glow": 1.0, "holo": 0.0},
+	"holo":    {"spec_k": 1.0,  "spec_pow": 40.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.6, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0, "glow": 0.0, "holo": 1.0},
+	"magic":   {"spec_k": 0.5,  "spec_pow": 70.0, "alpha_k": 1.0,  "clear_k": 0.0, "metal": 0.0, "matte": 0.0,  "crunch": 0.0, "fluff": 0.0, "thick_px": 230.0, "glow": 0.0, "holo": 0.0,
+				"hue_drift": 1.0},
 }
 
 @export var play_area := Rect2(70, 70, 1630, 1060):
@@ -54,9 +61,14 @@ var style := "shiny":
 		_smear_mult = STYLES[v].get("smear", 1.0)
 		_slump_mult = STYLES[v].get("slump", 1.0)
 		_press_mult = STYLES[v].get("press", 1.0)
+		_hue_drift = STYLES[v].get("hue_drift", 0.0)
+		if _hue_drift == 0.0:
+			_hue = 0.0
 		if _mat:
 			for k in UNIFORMS:
-				_mat.set_shader_parameter(k, STYLES[v][k])
+				_mat.set_shader_parameter(k, STYLES[v].get(k, 0.0))
+			_mat.set_shader_parameter("hue_shift", _hue)
+		style_changed.emit(v)
 
 var addins: Node2D
 var bubbles: Node2D
@@ -75,6 +87,9 @@ var _stretch_cd := 0.0
 var _smear_mult := 1.0
 var _slump_mult := 1.0
 var _press_mult := 1.0
+var _hue_drift := 0.0
+var _hue := 0.0
+var _knead_speed := 0.0
 
 var _rect: ColorRect
 var _mat: ShaderMaterial
@@ -286,6 +301,70 @@ func stamp(shape: String) -> void:
 	_wobble = 0.5
 
 
+## Knife: cut along a line (local px). Slime under the blade is pushed to either side,
+## leaving a groove that slowly heals. Returns true if any slime was cut.
+func slice(a_px: Vector2, b_px: Vector2) -> bool:
+	var a := to_grid_px(a_px)
+	var b := to_grid_px(b_px)
+	var half_w := 1.3                    # groove half-width in cells
+	var reach := 3.2                     # how far the displaced slime piles up
+	var x0 := maxi(0, int(minf(a.x, b.x) - reach) - 1)
+	var x1 := mini(GW - 1, int(maxf(a.x, b.x) + reach) + 1)
+	var y0 := maxi(0, int(minf(a.y, b.y) - reach) - 1)
+	var y1 := mini(GH - 1, int(maxf(a.y, b.y) + reach) + 1)
+	var removed := 0.0
+	var rim: Array = []
+	var rim_w := 0.0
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var q := Vector2(x + 0.5, y + 0.5)
+			var cp := Geometry2D.get_closest_point_to_segment(q, a, b)
+			var d := q.distance_to(cp)
+			var i := y * GW + x
+			if d < half_w:
+				var k := 0.85 * (1.0 - (d / half_w) * (d / half_w) * 0.5)
+				var take := _h[i] * k
+				_h[i] -= take
+				removed += take
+			elif d < reach and _h[i] > 0.01:
+				var t := 1.0 - absf(d - (half_w + 0.8)) / (reach - half_w)
+				if t > 0.0:
+					rim.append([i, t * t])
+					rim_w += t * t
+	if removed < 0.05:
+		return false
+	if rim_w > 0.0:
+		var per := removed / rim_w
+		for e in rim:
+			_h[e[0]] = minf(h_cap, _h[e[0]] + per * e[1])
+	sliced.emit()
+	return true
+
+
+## Snapshot of the whole slime for the jar shelf.
+func get_state() -> Dictionary:
+	return {"gw": GW, "gh": GH, "h": _h.duplicate(), "c": _c.duplicate(), "color": color,
+			"style": style, "sparkle": sparkle, "hue": _hue, "addins": addins.get_state()}
+
+
+func set_state(d: Dictionary) -> void:
+	if d.get("gw", 0) != GW or d.get("gh", 0) != GH:
+		reset()   # saved in the other orientation: start fresh in this one
+		return
+	_h = d["h"].duplicate()
+	_c = d["c"].duplicate()
+	_mass0 = _sum(_h)
+	color = d.get("color", color)
+	style = d.get("style", "shiny")
+	sparkle = d.get("sparkle", false)
+	_hue = d.get("hue", 0.0)
+	if _mat:
+		_mat.set_shader_parameter("hue_shift", _hue)
+	addins.set_state(d.get("addins", []))
+	bubbles.clear()
+	_wobble = 0.6
+
+
 func _shape_polygon(shape: String, r: float) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	if shape == "heart":
@@ -413,12 +492,15 @@ func _physics_process(delta: float) -> void:
 	_tick += 1
 	_stretch_cd = maxf(0.0, _stretch_cd - delta)
 	var rf := finger_px / _cell.x
+	var top_speed := 0.0
 	for f in _fingers.values():
 		var pos: Vector2 = f["pos"]
 		var v: Vector2 = pos - f["prev"]
 		f["prev"] = pos
 		var speed := v.length()
 		var on_slime := _sample(pos.x - 0.5, pos.y - 0.5) > 0.05
+		if on_slime:
+			top_speed = maxf(top_speed, speed)
 		if speed > 0.03:
 			_smear(pos, v * _smear_mult, rf * 1.9)
 			addins.advect(pos, v * smear_strength, rf * 1.9)
@@ -439,6 +521,11 @@ func _physics_process(delta: float) -> void:
 		var k := press_rate * _press_mult * (1.0 - 0.55 * clampf(speed / 1.5, 0.0, 1.0))
 		_press(pos, rf, k)
 		addins.push_out(pos, rf)
+	_knead_speed = lerpf(_knead_speed, top_speed, 0.25)
+	kneading.emit(_knead_speed)
+	if _hue_drift > 0.0 and top_speed > 0.05:
+		_hue = fmod(_hue + top_speed * 0.012 * _hue_drift, TAU)
+		_mat.set_shader_parameter("hue_shift", _hue)
 	if _tick % 3 == 0:
 		_relax(slump * 3.0 * _slump_mult)
 	if _tick % 6 == 0:

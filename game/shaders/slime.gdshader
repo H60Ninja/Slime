@@ -21,6 +21,9 @@ uniform float metal = 0.0;
 uniform float matte = 0.0;
 uniform float crunch = 0.0;      // foam beads bumps + speckles
 uniform float fluff = 0.0;       // soft fine texture
+uniform float glow = 0.0;        // emissive, lit for a dark room
+uniform float holo = 0.0;        // hue shifts with surface slope
+uniform float hue_shift = 0.0;   // colour-changing slime: global hue rotation (radians)
 
 void bspline(float t, out vec4 w, out vec4 dw) {
 	float t2 = t * t;
@@ -111,6 +114,14 @@ void fragment() {
 
 	vec3 ks = max(sample_c(UV), vec3(0.0));
 	vec3 cbase = 1.0 + ks - sqrt(ks * ks + 2.0 * ks);   // Kubelka-Munk K/S -> reflectance
+	if (hue_shift != 0.0 || holo > 0.0) {
+		float ang = hue_shift + holo * (slope.x * 1.4 + slope.y * 0.9 + time * 0.6);
+		// rotate hue around the grey axis (Rodrigues)
+		vec3 k = vec3(0.57735);
+		float cs = cos(ang), sn = sin(ang);
+		cbase = cbase * cs + cross(k, cbase) * sn + k * dot(k, cbase) * (1.0 - cs);
+		cbase = clamp(cbase, 0.0, 1.0);
+	}
 	vec3 base = mix(cbase * 1.06 + 0.04, cbase * 0.84, smoothstep(0.0, 1.2, h));
 	base = mix(base, cbase * 0.72, metal);
 	base = mix(base, base * 1.12 + 0.08, clear_k * 0.6);
@@ -127,11 +138,25 @@ void fragment() {
 	}
 
 	float alpha = smoothstep(0.02, 0.06, h) * alpha_k;
+	float halo = 0.0;
+	if (glow > 0.0) {
+		// dark room: the slime is its own light; thin parts glow brighter at the edge
+		vec3 g = cbase * (1.05 + 0.6 * pow(1.0 - n.z, 1.2)) + vec3(0.2) * cbase;
+		col = mix(col, g + vec3(spec) * 0.6, glow);
+		// soft light spill onto the table around the lump
+		float hh = sample_h(UV + vec2(0.0, 0.0)).x;
+		float near = sample_h(UV + vec2(0.012, 0.0)).x + sample_h(UV - vec2(0.012, 0.0)).x + sample_h(UV + vec2(0.0, 0.018)).x + sample_h(UV - vec2(0.0, 0.018)).x;
+		halo = smoothstep(0.0, 0.5, near) * (1.0 - alpha) * 0.55 * glow;
+	}
 	// soft drop shadow: slime a little up-left of this pixel casts onto the table
 	float hs = sample_h(UV - vec2(12.0, 16.0) / (grid * cell_px)).x;
 	float shadow = smoothstep(0.02, 0.2, hs) * 0.22;
 	vec3 table = vec3(0.0);
-	float out_a = max(alpha, shadow);
+	float out_a = max(alpha, shadow * (1.0 - glow));
 	vec3 out_rgb = mix(table, col, alpha / max(out_a, 0.0001));
+	if (halo > 0.0) {
+		out_rgb = mix(out_rgb, cbase, halo / max(out_a + halo, 0.0001) * (1.0 - alpha));
+		out_a = max(out_a, halo);
+	}
 	COLOR = vec4(out_rgb, out_a);
 }

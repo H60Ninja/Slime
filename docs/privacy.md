@@ -15,6 +15,8 @@ connection and it collects nothing.
 - **Local settings only.** The chosen slime colour and sparkle setting are saved on the
   device so they are remembered next time. They never leave the device and are deleted
   when the app is uninstalled.
+- **Saved slimes.** The jar shelf keeps up to six slimes inside the app's own private
+  storage on the device. They are removed when the app is uninstalled.
 - **Snapshots.** The camera button saves a picture of the slime into the tablet's own
   Pictures folder (a "Slime" album) so it can be shown to a grown-up. The picture stays
   on the device. Slime never reads other photos.
