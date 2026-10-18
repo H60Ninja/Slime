@@ -6,7 +6,7 @@
 |---|---|
 | 0 Toolchain | ✅ done — emulator, two AVDs, Godot 4.7.2 + templates, debug + release keystores |
 | 1 Skeleton | ✅ done — repo, Makefile, presets, CLAUDE.md |
-| 2 Slime | ✅ playable — soft body, multi-touch poke/smear/push, dents, sounds, haptic; verified on API 30 + API 36 emulators at 60 fps (API 30) |
+| 2 Slime | ✅ v2 **moldable lump** (thickness field): press leaves craters with rims, drags carry slime into strands, pinches pile ridges, spreads thin; shapes persist and slowly slump. 60 fps on the API 30 emulator. v1 ring-blob replaced 2026-10-17 after Adam reviewed competitor apps |
 | 3 Colours | ✅ v1 — 10 colours, sparkle, new-slime, settings persist |
 | 4 Polish | ✅ v1 — icon, landscape lock, immersive, privacy page, store screenshots. **Not yet tested on a real Fire tablet** |
 | 5 Amazon | ⏳ ready to submit: `build/slime-release.apk` (release-signed, targetSdk 36). Needs Adam's Amazon developer account |

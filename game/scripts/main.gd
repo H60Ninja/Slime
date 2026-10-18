@@ -85,7 +85,7 @@ func _play(p: AudioStreamPlayer) -> void:
 
 func _on_color(c: Color) -> void:
 	slime.color = c
-	slime.wobble(0.10)
+	slime.wobble(1.0)
 	_play(_squish.pick_random())
 	_save()
 

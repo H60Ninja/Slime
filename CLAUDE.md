@@ -22,6 +22,14 @@ never the Vehlo account. See `PLAN.md` for the phase plan and store notes.
 - Release keystore: `~/.android/slime-release.jks`, alias `slime`, password in the login Keychain (service `slime-release-keystore`); the Makefile passes it to Godot through `GODOT_ANDROID_KEYSTORE_RELEASE_*`. Back it up.
 - Renderer is **gl_compatibility**: Vulkan fails in the emulator and is riskier on Fire GPUs.
 
+## How the slime works (v2)
+`game/scripts/slime.gd` holds an 80x52 `PackedFloat32Array` of thickness. Per physics tick each
+finger runs `_press` (mass-conserving crater + rim) and `_smear` (backward advection within the
+finger radius); `_relax` diffuses every 3rd tick; mass is renormalised every 4th tick. The field is
+uploaded as a FORMAT_RF texture and `game/shaders/slime.gdshader` reconstructs it with a cubic
+B-spline (16 texelFetch, no float-filtering dependency) and lights it. Feel knobs are the
+`@export`s at the top of slime.gd: `press_rate`, `smear_strength`, `slump`, `finger_px`.
+
 ## Rules
 - No internet permission, no analytics, no ads, no text in the UI (kids may not read).
 - `minSdk` 30 (Fire OS 8), `targetSdk` 36 (Google Play requirement from 2026-08-31).
