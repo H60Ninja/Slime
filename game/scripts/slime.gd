@@ -53,7 +53,7 @@ var bubbles: Node2D
 
 var _h := PackedFloat32Array()
 var _tmp := PackedFloat32Array()
-var _c := PackedFloat32Array()     # rgb interleaved
+var _c := PackedFloat32Array()     # per cell: Kubelka-Munk K/S for r,g,b (paint-like mixing)
 var _ctmp := PackedFloat32Array()
 var _mass0 := 0.0
 var _cell := Vector2(20, 20)
@@ -155,10 +155,11 @@ func reset() -> void:
 			var dy := (y + 0.5 - c.y) / ry
 			var d2 := dx * dx + dy * dy
 			_h[y * GW + x] = pow(1.0 - d2, 0.55) * 0.95 if d2 < 1.0 else 0.0
+	var ks := to_ks(color)
 	for i in GW * GH:
-		_c[i * 3] = color.r
-		_c[i * 3 + 1] = color.g
-		_c[i * 3 + 2] = color.b
+		_c[i * 3] = ks.x
+		_c[i * 3 + 1] = ks.y
+		_c[i * 3 + 2] = ks.z
 	_mass0 = _sum(_h)
 	_fingers.clear()
 	_wobble = 1.0
@@ -171,6 +172,7 @@ func reset() -> void:
 ## Pour a drop of the selected colour onto the lump (adds a little slime too).
 func drop(col: Color) -> void:
 	color = col
+	var ks := to_ks(col)
 	var c := _centroid()
 	var r := drop_px / _cell.x
 	var r2 := r * r
@@ -187,9 +189,9 @@ func drop(col: Color) -> void:
 				var w := 1.0 - d2 / r2
 				var i := y * GW + x
 				var blend := minf(1.0, w * 2.4)
-				_c[i * 3] = lerpf(_c[i * 3], col.r, blend)
-				_c[i * 3 + 1] = lerpf(_c[i * 3 + 1], col.g, blend)
-				_c[i * 3 + 2] = lerpf(_c[i * 3 + 2], col.b, blend)
+				_c[i * 3] = lerpf(_c[i * 3], ks.x, blend)
+				_c[i * 3 + 1] = lerpf(_c[i * 3 + 1], ks.y, blend)
+				_c[i * 3 + 2] = lerpf(_c[i * 3 + 2], ks.z, blend)
 				_h[i] = minf(h_cap, _h[i] + 0.45 * w * w)
 	_mass0 = _sum(_h)
 	_wobble = 0.8
@@ -273,6 +275,44 @@ func slime_cells(min_h: float) -> Array[Vector2]:
 
 func sample_height(fx: float, fy: float) -> float:
 	return _sample(fx, fy)
+
+
+## Displayed slime colour at a grid position (bilinear in K/S space, like the shader).
+func sample_color(fx: float, fy: float) -> Color:
+	fx = clampf(fx, 0.0, GW - 1.001)
+	fy = clampf(fy, 0.0, GH - 1.001)
+	var x := int(fx)
+	var y := int(fy)
+	var tx := fx - x
+	var ty := fy - y
+	var i0 := (y * GW + x) * 3
+	var i1 := i0 + 3
+	var i2 := i0 + GW * 3
+	var i3 := i2 + 3
+	var out := Vector3.ZERO
+	for ch in 3:
+		var a := _c[i0 + ch] + (_c[i1 + ch] - _c[i0 + ch]) * tx
+		var b := _c[i2 + ch] + (_c[i3 + ch] - _c[i2 + ch]) * tx
+		out[ch] = a + (b - a) * ty
+	return from_ks(out)
+
+
+## Kubelka-Munk: reflectance -> K/S. Mixing K/S linearly behaves like mixing paint
+## (yellow + blue = green, red + yellow = orange) instead of averaging light.
+static func to_ks(c: Color) -> Vector3:
+	var v := Vector3.ZERO
+	for ch in 3:
+		var r := clampf(c[ch], 0.02, 0.985)
+		v[ch] = (1.0 - r) * (1.0 - r) / (2.0 * r)
+	return v
+
+
+static func from_ks(v: Vector3) -> Color:
+	var c := Color(0, 0, 0, 1)
+	for ch in 3:
+		var k := maxf(v[ch], 0.0)
+		c[ch] = 1.0 + k - sqrt(k * k + 2.0 * k)
+	return c
 
 
 func _centroid() -> Vector2:

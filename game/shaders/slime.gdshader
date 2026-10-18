@@ -1,7 +1,7 @@
 shader_type canvas_item;
 render_mode blend_mix;
 
-// Thickness field (FORMAT_RF) and per-cell colour (FORMAT_RGBF); both sampled with
+// Thickness field (FORMAT_RF) and per-cell colour as Kubelka-Munk K/S (FORMAT_RGBF); both sampled with
 // texelFetch so no float-texture filtering support is required on the GPU.
 uniform sampler2D height_tex : filter_nearest, repeat_disable;
 uniform sampler2D color_tex : filter_nearest, repeat_disable;
@@ -90,7 +90,8 @@ void fragment() {
 	float spec = pow(max(dot(n, H), 0.0), spec_pow) * spec_k * (1.0 - 0.9 * matte);
 	float rim = pow(1.0 - n.z, 2.0) * mix(0.25, 0.5, clear_k);
 
-	vec3 cbase = sample_c(UV);
+	vec3 ks = max(sample_c(UV), vec3(0.0));
+	vec3 cbase = 1.0 + ks - sqrt(ks * ks + 2.0 * ks);   // Kubelka-Munk K/S -> reflectance
 	vec3 base = mix(cbase * 1.06 + 0.04, cbase * 0.84, smoothstep(0.0, 1.2, h));
 	base = mix(base, cbase * 0.72, metal);
 	base = mix(base, base * 1.12 + 0.08, clear_k * 0.6);

@@ -73,14 +73,22 @@ func _draw() -> void:
 		var h: float = slime.sample_height(gp.x - 0.5, gp.y - 0.5)
 		var px := origin + gp * cell
 		var on := clampf(h / 0.08, 0.0, 1.0)         # fades when it ends up on bare table
+		var sink := clampf((h - 0.15) / 0.9, 0.0, 1.0)  # how deep it sits in thick slime
 		var size: float = it["size"] * (0.75 + 0.25 * on)
 		var col: Color = it["col"]
 		col.a = 0.55 + 0.45 * on
+		var slime_col: Color = slime.sample_color(gp.x - 0.5, gp.y - 0.5)
 		if it["kind"] == Kind.BEAD:
 			var rr := 12.0 * size
-			draw_circle(px + Vector2(2, 3), rr, Color(0, 0, 0, 0.12 * on))
+			# dimple in the slime around a sunk bead
+			draw_circle(px, rr * (1.0 + 0.35 * sink), Color(slime_col.r * 0.55, slime_col.g * 0.55, slime_col.b * 0.55, 0.35 * sink))
+			draw_circle(px + Vector2(2, 3), rr, Color(0, 0, 0, 0.12 * on * (1.0 - sink)))
 			draw_circle(px, rr, col)
 			draw_circle(px + Vector2(-rr * 0.35, -rr * 0.35), rr * 0.36, Color(1, 1, 1, 0.65 * col.a))
+			# translucent slime covering the lower part of the bead
+			var cover := Color(slime_col.r, slime_col.g, slime_col.b, 0.4 * sink)
+			draw_circle(px + Vector2(0, rr * 0.25), rr * 1.02, cover)
+			draw_arc(px, rr * 1.02, 0.0, TAU, 24, Color(1, 1, 1, 0.25 * sink), 1.5, true)
 		else:
 			var pts := PackedVector2Array()
 			for i in 10:
@@ -88,3 +96,5 @@ func _draw() -> void:
 				var a: float = it["rot"] + TAU * i / 10.0
 				pts.append(px + Vector2(cos(a), sin(a)) * rad)
 			draw_colored_polygon(pts, col)
+			if sink > 0.0:
+				draw_colored_polygon(pts, Color(slime_col.r, slime_col.g, slime_col.b, 0.4 * sink))

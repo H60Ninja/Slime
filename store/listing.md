@@ -17,9 +17,9 @@ marble. Stamp a star or a heart. Sprinkle beads. The slime keeps the shape you g
 slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like.
 
 - Real molding physics: craters, strands, ridges, peaks — it keeps your shape
-- 10 bright colours: pour drops in and swirl them into marble
+- 10 bright colours: pour drops in and swirl them like real paint — yellow and blue make green
 - Four slime types: shiny, clear, metallic, cloud — plus sparkle
-- Sprinkle in beads and stars that ride along with the slime
+- Sprinkle in beads and stars that sink in and ride along with the slime
 - Star and heart cookie-cutter stamps
 - Bubbles rise under a held finger and pop when you sweep through them
 - Wet squish, stretch, squelch, bubble and pop sounds

@@ -30,7 +30,7 @@ uploaded as a FORMAT_RF texture and `game/shaders/slime.gdshader` reconstructs i
 B-spline (16 texelFetch, no float-filtering dependency) and lights it. Feel knobs are the
 `@export`s at the top of slime.gd: `press_rate`, `smear_strength`, `slump`, `finger_px`.
 
-Colour lives in a second interleaved RGB float array `_c` (FORMAT_RGBF texture), advected
+Colour lives in a second interleaved float array `_c` holding Kubelka-Munk K/S per channel (FORMAT_RGBF texture; linear mixing there behaves like paint, the shader converts back to reflectance), advected
 with the slime in `_smear` (thickness-weighted) and blended by `_mix`. `drop()` pours a colour
 at the centroid; `stamp()` presses a star/heart polygon in. `scripts/addins.gd` holds beads and
 stars that `advect`/`push_out` with the fingers. Styles are shader-uniform sets in
