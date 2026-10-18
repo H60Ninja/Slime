@@ -26,6 +26,7 @@ export-apk:         ## debug APK for emulators / adb sideload
 android-template:   ## (one-time) install Godot's Gradle build template into game/android (needed by export-aab)
 	mkdir -p game/android/build && cd game/android/build && unzip -q -o "$(HOME)/Library/Application Support/Godot/export_templates/4.7.2.stable/android_source.zip"
 	echo "4.7.2.stable" > game/android/.build_version
+	touch game/android/build/.gdignore   # keep the Godot importer out of the Gradle res/ folder
 
 export-apk-release: ## release-signed APK for the Amazon Appstore
 	mkdir -p build && $(GODOT) --headless --path game --export-release "Android APK" ../$(APK_REL)
