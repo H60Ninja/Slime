@@ -10,8 +10,8 @@
 | 3 Features | ✅ colour drops + paint-style swirl mixing (Kubelka-Munk per-cell colour field), 4 styles (shiny/clear/metal/cloud), sparkle, beads + stars add-ins that ride the slime, star/heart stamps, pour animation with splash, bubbles that rise and pop, 10 sounds, settings persist |
 | 3b Research round | ✅ 2026-10-18 — speed-responsive wet loop, glow/holo/magic kinds, knife, jar shelf (6 saves), listing rewritten around "no ads / sensory". See `docs/market-research.md` |
 | 3c UX + release prep | ✅ 2026-10-18 — guided opening (hand cue, step icons, colour bottles under the bowl, go button, chrome hidden), themed sets, scented puffs, press bounce, Android back handling, first-touch hint, v1.0.0 / versionCode 2, `store/checklist.md` |
-| 4 Polish | ✅ v2 — make-slime ritual on first run, 7 kinds (crunchy/butter/fluffy added with own sounds), snapshot to Pictures via MediaStore, portrait + landscape, generated icon + feature graphic, privacy page, 6 store screenshots. **Not yet tested on a real Fire tablet** |
-| 5 Amazon | ⏳ ready to submit: `build/slime-release.apk`, all assets, field-by-field guide in `docs/amazon-submission.md`. Needs Adam: developer account, ID verification, a physical-device test |
+| 4 Polish | ✅ v2 — make-slime ritual on first run, 7 kinds (crunchy/butter/fluffy added with own sounds), snapshot to Pictures via MediaStore, portrait + landscape, generated icon + feature graphic, privacy page, 6 store screenshots. Tested by Adam on the onn. kids tablet 2026-10-18: works. Fire OS pass still pending |
+| 5 Amazon | ⏳ ready to submit: `build/slime-release.apk`, all assets, field-by-field guide in `docs/amazon-submission.md`. Needs Adam: developer account + ID verification |
 | 6 Google | ⏳ ready to upload: `build/slime-release.aab`. Needs Adam's Play account + 12 testers |
 | 7 Maint. | — |
 

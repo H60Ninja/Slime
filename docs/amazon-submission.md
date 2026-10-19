@@ -10,7 +10,7 @@ go; the structure has been stable.
 |---|---|---|
 | Amazon customer account + Amazon developer account (same email). **Personal, not Vehlo.** | Understanding Submission | **Adam** |
 | **Identity verification**: front and back photos of the account owner's government ID; the name must match "Full legal name" on the Company Profile. A banner appears in the console when requested. | Identity Verification | **Adam** |
-| Physical-device test before submitting ("the Amazon Appstore requires that you test on a physical device"). | Presubmission Checklist | **Pending**: no Fire tablet yet; the onn. tablet is Android, not Fire OS, but counts as a physical test once Adam says go |
+| Physical-device test before submitting ("the Amazon Appstore requires that you test on a physical device"). | Presubmission Checklist | ✅ Adam tested on the onn. 11" kids tablet (Android 16) 2026-10-18; works. Re-check on a Fire tablet when one is available |
 | Binary: APK or AAB; versionName < 50 chars; versionCode increases each release; zip-aligned; 32-bit **and** 64-bit libs both present (do not drop armeabi-v7a). | Understanding Submission | ✅ `build/slime-release.apk` 1.0.0 / code 2, arm64-v8a + armeabi-v7a, zip-aligned |
 | Fire OS 8 minimum targetSdk 30 (Fire OS 14: 34, Fire OS 16: 36). | Device Filtering | ✅ targetSdk 36, minSdk 24 |
 | Install location: Amazon recommends `preferExternal`. | Presubmission Checklist | Godot sets `auto`; acceptable (recommendation, not requirement) |
