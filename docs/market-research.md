@@ -129,3 +129,23 @@ families and a 4.7-star page; it is not a path to the top charts without spendin
 - Slime shops: https://www.abc15.com/entertainment/events/slimeatory-a-gilbert-shop-with-a-diy-slime-bar-and-to-go-supplies , https://sloomooinstitute.com/blogs/sloomoo-stories/meet-oxide-slimes
 - 2026 slime kit roundups: https://products.newsnationnow.com/toys-and-games/hobby-collectibles/best-slime-kits , https://www.peggyomara.com/?p=18005
 - Sensory / OT app roundups: https://sourcekids.com.au/7-apps-to-help-with-sensory-processing-and-self-regulation/ , https://otsimo.com/en/best-sensory-autism-apps/
+
+## 6. Would anyone pay 99c? (2026-10-18 follow-up)
+
+Evidence, such as it is:
+- The leading slime app (Super Slime Simulator) peaks at roughly $2–3K/week US revenue on
+  50–80K weekly downloads (Sensor Tower blog snapshots 2023–2025). That is on the order of
+  4 cents per download, from ads plus a $14.99 ad-removal IAP and premium slimes.
+- General benchmarks: 1–5% of free users ever pay; a one-time unlock in a small app usually
+  converts well under 2%. No kids-specific, 99c-specific study exists.
+- The respected kids studios abandoned the cheap one-off: Toca Boca was $3–5 per app, Sago
+  Mini moved to a subscription (Piknik), Pazu/Pepi sell $0.99 "remove ads" packs, $1.99–2.99
+  unlock packs and $5–10/month passes. Nobody prices the main unlock at 99c.
+- Parent reviews reward "no ads, no tracking, no surprises" and punish "lost purchases" and
+  "unexpected charges" far more than they reward content volume.
+- Amazon keeps 20% under $1M/yr; Google 15%. Kids+ pays partners by invitation only and
+  publishes no rates.
+
+Conclusion: a 99c unlock is *plausible* but tiny money. At a realistic 1–2% of installs and
+a few hundred to a few thousand installs a month, it is tens of dollars a month. The price
+mostly signals "I'm not a free-to-play trap", which is worth more than the revenue.
