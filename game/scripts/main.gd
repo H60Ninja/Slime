@@ -10,6 +10,16 @@ const JarsScript := preload("res://scripts/jars.gd")
 const PickerScript := preload("res://scripts/picker.gd")
 const ScentsScript := preload("res://scripts/scents.gd")
 const HandScript := preload("res://scripts/hand.gd")
+const StoreScript := preload("res://scripts/store.gd")
+const GateScript := preload("res://scripts/gate.gd")
+
+# Premium ("Slime Shop", one-time unlock). Hidden entirely until billing exists.
+const PREMIUM_THEMES := {
+	"candy":  {"color": Color("ff8fcf"), "style": "shiny", "sparkle": true, "drops": [Color("7fd3ff"), Color("ffe44d"), Color("f4f4ff")], "beads": 12, "stars": 0, "scent": "bubblegum"},
+	"ocean":  {"color": Color("4fb8ff"), "style": "clear", "sparkle": false, "drops": [Color("3fe0b8"), Color("f4f4ff")], "beads": 0, "stars": 8, "scent": "mint"},
+	"dino":   {"color": Color("6fe36a"), "style": "crunchy", "sparkle": false, "drops": [Color("2c2c5e")], "beads": 10, "stars": 0, "scent": ""},
+	"sunset": {"color": Color("ff9b2f"), "style": "butter", "sparkle": false, "drops": [Color("ff5fb8"), Color("9d6bff")], "beads": 0, "stars": 0, "scent": "strawberry"},
+}
 
 const THEMES := {
 	"icecream": {"color": Color("ff9ad5"), "style": "cloud", "sparkle": false, "drops": [Color("fff2bf"), Color("9fd8ff")], "beads": 14, "stars": 0, "scent": "strawberry"},
@@ -52,6 +62,14 @@ var scents_picker: CanvasLayer
 var scents: Node2D
 var _hint: Node2D
 var _hint_t := 0.0
+var store: Node
+var gate: CanvasLayer
+var sprinkles_picker: CanvasLayer
+var stamps_picker: CanvasLayer
+var _roller := false
+var _roller_pts := {}
+var _roller_remembered := false
+var _knife_remembered := false
 var _fps_timer := 0.0
 var _snapping := false
 
@@ -74,8 +92,11 @@ func _ready() -> void:
 	ui.bowl_pressed.connect(func(): if not mixing: _start_mixing())
 	ui.themes_pressed.connect(func(): if not mixing: themes.open(); _play(_click))
 	ui.scents_pressed.connect(func(): if not mixing: scents_picker.open(scents.scent); _play(_click))
-	ui.addin_pressed.connect(func(kind: int): slime.addins.sprinkle(kind, 10); _play(_sprinkle))
-	ui.stamp_pressed.connect(func(shape: String): slime.stamp(shape); _play(_squelches.pick_random()))
+	ui.sprinkles_pressed.connect(func(): if not mixing: sprinkles_picker.open(); _play(_click))
+	ui.stamps_pressed.connect(func(): if not mixing: stamps_picker.open(); _play(_click))
+	ui.glue_pressed.connect(_on_glue)
+	ui.roller_toggled.connect(_on_roller)
+	ui.undo_pressed.connect(_on_undo)
 	ui.snapshot_pressed.connect(_snapshot)
 	ui.knife_toggled.connect(_on_knife)
 	ui.jars_pressed.connect(func(): if not mixing: jars.open(); _play(_jar))
@@ -85,7 +106,7 @@ func _ready() -> void:
 	slime.knead_at.connect(func(px: Vector2): scents.puff(px, 1))
 	slime.sliced.connect(func(): _play(_slice_crunch if slime.style == "crunchy" else _slice_wets.pick_random()))
 	slime.touched.connect(func(inside: bool): if inside: _play(_touch_sound()))
-	slime.released.connect(func(inside: bool): if inside: _play(_pops.pick_random()); slime.wobble(0.3))
+	slime.released.connect(func(inside: bool): if inside: _play(_pops.pick_random()); slime.wobble(0.3); _refresh_undo())
 	slime.stretched.connect(func(): _play(_crackles.pick_random() if slime.style == "crunchy" else _stretches.pick_random()))
 	slime.held.connect(func(): _play(_poofs.pick_random() if slime.style == "fluffy" else _squelches.pick_random()))
 	slime.bubbles.popped.connect(func(): _play(_bubble.pick_random()))
@@ -141,10 +162,7 @@ func _ready() -> void:
 	themes = PickerScript.new()
 	themes.name = "Themes"
 	add_child(themes)
-	var titems := []
-	for id in THEMES:
-		titems.append({"id": id, "draw": _draw_theme_tile.bind(id)})
-	themes.setup(titems, 3)
+	themes.setup([], 4)
 	themes.picked.connect(_apply_theme)
 
 	scents_picker = PickerScript.new()
@@ -155,6 +173,31 @@ func _ready() -> void:
 		sitems.append({"id": k, "draw": _draw_scent_tile.bind(k)})
 	scents_picker.setup(sitems, 4)
 	scents_picker.picked.connect(func(id: String): scents.scent = id; ui.set_scent(id); _play(_sprinkle); _save())
+
+	store = StoreScript.new()
+	store.name = "Store"
+	add_child(store)
+	store.changed.connect(_rebuild_pickers)
+	gate = GateScript.new()
+	gate.name = "Gate"
+	add_child(gate)
+	gate.confirmed.connect(func(): store.purchase())
+
+	sprinkles_picker = PickerScript.new()
+	sprinkles_picker.name = "Sprinkles"
+	add_child(sprinkles_picker)
+	sprinkles_picker.setup([], 4)
+	sprinkles_picker.picked.connect(_on_sprinkle)
+	sprinkles_picker.locked_picked.connect(func(_id: String): gate.open())
+
+	stamps_picker = PickerScript.new()
+	stamps_picker.name = "Stamps"
+	add_child(stamps_picker)
+	stamps_picker.setup([], 4)
+	stamps_picker.picked.connect(func(shape: String): slime.remember(); slime.stamp(shape); _play(_squelches.pick_random()); _refresh_undo())
+	stamps_picker.locked_picked.connect(func(_id: String): gate.open())
+	themes.locked_picked.connect(func(_id: String): gate.open())
+	_rebuild_pickers()
 
 	_hint = HandScript.new()
 	_hint.z_index = 20
@@ -170,6 +213,7 @@ func _ready() -> void:
 	var first_run := not _load()
 	if first_run:
 		_start_mixing()
+	_refresh_undo()
 
 
 ## Each kind on the left column has its own landing voice.
@@ -301,6 +345,9 @@ func _start_mixing() -> void:
 	if _knife:
 		_knife = false
 		ui.set_knife(false)
+	if _roller:
+		_roller = false
+		ui.set_roller(false)
 
 
 func _on_mix_color(col: Color, from: Vector2) -> void:
@@ -320,11 +367,12 @@ func _on_mixed(col: Color) -> void:
 	slime.color = col
 	slime.reset()
 	slime.visible = true
-	slime.set_process_unhandled_input(not _knife)
+	slime.set_process_unhandled_input(not (_knife or _roller))
 	slime.set_physics_process(true)
 	_play(_slurps.pick_random())
 	_save()
 	_show_hint()
+	_refresh_undo()
 
 
 ## First touch hint: a hand presses the lump, then smears it.
@@ -343,9 +391,11 @@ func _hide_hint() -> void:
 func _on_new() -> void:
 	if mixing:
 		return
+	slime.remember()
 	slime.reset()
 	scents.puff(slime.drop_target(), 4)
 	_play(_slurps.pick_random())
+	_refresh_undo()
 
 
 func _on_color(c: Color, from: Vector2) -> void:
@@ -359,8 +409,139 @@ func _on_color(c: Color, from: Vector2) -> void:
 	_play(_pops.pick_random())
 
 
+## Pickers show free items always, premium items only when owned or purchasable.
+func _rebuild_pickers() -> void:
+	var titems := []
+	for id in THEMES:
+		titems.append({"id": id, "draw": _draw_theme_tile.bind(id)})
+	if store.show_premium():
+		for id in PREMIUM_THEMES:
+			titems.append({"id": id, "draw": _draw_theme_tile.bind(id), "locked": not store.is_unlocked()})
+	themes.set_items(titems)
+	var sitems := [
+		{"id": "beads", "draw": _draw_sprinkle_tile.bind("beads")},
+		{"id": "stars", "draw": _draw_sprinkle_tile.bind("stars")},
+	]
+	if store.show_premium():
+		sitems.append({"id": "rainbow", "draw": _draw_sprinkle_tile.bind("rainbow"), "locked": not store.is_unlocked()})
+	sprinkles_picker.set_items(sitems)
+	var stitems := [
+		{"id": "star", "draw": _draw_stamp_tile.bind("star")},
+		{"id": "heart", "draw": _draw_stamp_tile.bind("heart")},
+		{"id": "circle", "draw": _draw_stamp_tile.bind("circle")},
+		{"id": "flower", "draw": _draw_stamp_tile.bind("flower")},
+	]
+	stamps_picker.set_items(stitems)
+
+
+func _theme_data(id: String) -> Dictionary:
+	return THEMES[id] if THEMES.has(id) else PREMIUM_THEMES[id]
+
+
+func _on_sprinkle(id: String) -> void:
+	slime.remember()
+	match id:
+		"beads":
+			slime.addins.sprinkle(0, 10)
+		"stars":
+			slime.addins.sprinkle(1, 10)
+		"rainbow":
+			slime.addins.sprinkle(0, 8)
+			slime.addins.sprinkle(1, 6)
+	_play(_sprinkle)
+	_refresh_undo()
+
+
+func _on_glue() -> void:
+	if mixing:
+		return
+	slime.remember()
+	var from := Vector2(slime.drop_target().x, _play_area.position.y - 60)
+	var pour := PourScript.new()
+	pour.color = Color("f2f2f6")
+	pour.start = from
+	pour.target = slime.drop_target()
+	pour.position = from
+	pour.landed.connect(func(_c: Color, _at: Vector2):
+		if slime.add_glue():
+			scents.puff(slime.drop_target(), 3)
+			_play(_slurps.pick_random())
+		else:
+			_play(_pops.pick_random())
+		_refresh_undo())
+	add_child(pour)
+
+
+func _on_undo() -> void:
+	if mixing:
+		return
+	if slime.undo():
+		_play(_squish.pick_random())
+	_refresh_undo()
+
+
+func _refresh_undo() -> void:
+	ui.set_undo_enabled(slime.can_undo())
+
+
+func _draw_sprinkle_tile(c: CanvasItem, r: Rect2, id: String) -> void:
+	var centre := r.get_center()
+	match id:
+		"beads":
+			for q: Vector2 in [Vector2(-40, 20), Vector2(30, 28), Vector2(0, -30), Vector2(-20, -5), Vector2(38, -22)]:
+				c.draw_circle(centre + q, 22, Color.from_hsv(fmod(q.x * 0.01 + 0.5, 1.0), 0.45, 1.0))
+				c.draw_circle(centre + q + Vector2(-7, -7), 7, Color(1, 1, 1, 0.7))
+		"stars":
+			for q: Vector2 in [Vector2(-34, 22), Vector2(34, -26), Vector2(6, 10)]:
+				var pts := PackedVector2Array()
+				for i in 10:
+					var rr := 30.0 if i % 2 == 0 else 13.0
+					var a := -PI / 2 + TAU * i / 10
+					pts.append(centre + q + Vector2(cos(a), sin(a)) * rr)
+				c.draw_colored_polygon(pts, [Color("ffd84d"), Color("ff9ad5"), Color("7fe3ff")][int(q.x) % 3])
+		"rainbow":
+			for i in 7:
+				var a := -PI / 2 + TAU * i / 7.0
+				c.draw_circle(centre + Vector2(cos(a), sin(a)) * 48, 18, Color.from_hsv(i / 7.0, 0.7, 1.0))
+			var pts := PackedVector2Array()
+			for i in 10:
+				var rr := 26.0 if i % 2 == 0 else 11.0
+				var a := -PI / 2 + TAU * i / 10
+				pts.append(centre + Vector2(cos(a), sin(a)) * rr)
+			c.draw_colored_polygon(pts, Color.WHITE)
+
+
+func _draw_stamp_tile(c: CanvasItem, r: Rect2, shape: String) -> void:
+	var centre := r.get_center()
+	var pts := PackedVector2Array()
+	match shape:
+		"star":
+			for i in 10:
+				var rr := 70.0 if i % 2 == 0 else 32.0
+				var a := -PI / 2 + TAU * i / 10
+				pts.append(centre + Vector2(cos(a), sin(a)) * rr)
+		"heart":
+			for i in 40:
+				var t := TAU * i / 40.0
+				var x := 16.0 * pow(sin(t), 3.0)
+				var y := -(13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t))
+				pts.append(centre + Vector2(x, y) * 4.2 + Vector2(0, 6))
+		"circle":
+			for i in 32:
+				var a := TAU * i / 32.0
+				pts.append(centre + Vector2(cos(a), sin(a)) * 62)
+		"flower":
+			for i in 60:
+				var a := TAU * i / 60.0
+				var rr := 70.0 * (0.62 + 0.38 * absf(cos(2.5 * a)))
+				pts.append(centre + Vector2(cos(a), sin(a)) * rr)
+	pts.append(pts[0])
+	c.draw_polyline(pts, {"star": Color("8a8fa8"), "heart": Color("ff7aa8"), "circle": Color("4fb8ff"), "flower": Color("ff9b2f")}[shape], 12.0, true)
+
+
 func _apply_theme(id: String) -> void:
-	var t: Dictionary = THEMES[id]
+	var t: Dictionary = _theme_data(id)
+	slime.remember()
 	slime.color = t["color"]
 	slime.style = t["style"]
 	slime.sparkle = t["sparkle"]
@@ -383,7 +564,7 @@ func _apply_theme(id: String) -> void:
 
 
 func _draw_theme_tile(c: CanvasItem, r: Rect2, id: String) -> void:
-	var t: Dictionary = THEMES[id]
+	var t: Dictionary = _theme_data(id)
 	var centre := r.get_center()
 	var rad := r.size.x * 0.34
 	var base: Color = t["color"]
@@ -432,6 +613,16 @@ func _notification(what: int) -> void:
 			themes.close()
 		elif scents_picker.visible:
 			scents_picker.close()
+		elif sprinkles_picker.visible:
+			sprinkles_picker.close()
+		elif stamps_picker.visible:
+			stamps_picker.close()
+		elif gate.visible:
+			gate.close()
+		elif _roller:
+			_roller = false
+			ui.set_roller(false)
+			_on_roller(false)
 		elif _knife:
 			_knife = false
 			ui.set_knife(false)
@@ -541,28 +732,47 @@ func _flash_and_polaroid(img: Image, _saved: bool) -> void:
 
 func _on_knife(on: bool) -> void:
 	_knife = on
-	slime.set_process_unhandled_input(not on)
+	if on:
+		_roller = false
+	slime.set_process_unhandled_input(not (_knife or _roller))
+	_knife_pts.clear()
+	_play(_click)
+
+
+func _on_roller(on: bool) -> void:
+	_roller = on
+	if on:
+		_knife = false
+	slime.set_process_unhandled_input(not (_knife or _roller))
 	_knife_pts.clear()
 	_play(_click)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _knife or mixing:
+	if not (_knife or _roller) or mixing:
 		return
 	if event is InputEventScreenTouch:
 		var p := make_canvas_position_local(event.position)
 		if event.pressed:
+			if _knife_pts.is_empty():
+				slime.remember()
 			_knife_pts[event.index] = p
+			_knife_trail.roller = _roller
 			_knife_trail.begin(p)
 		else:
 			_knife_pts.erase(event.index)
 			_knife_trail.end()
+			_refresh_undo()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventScreenDrag and _knife_pts.has(event.index):
 		var p := make_canvas_position_local(event.position)
 		var prev: Vector2 = _knife_pts[event.index]
 		if p.distance_to(prev) > 6.0:
-			slime.slice(prev, p)
+			if _roller:
+				if slime.roll(prev, p) and randf() < 0.12:
+					_play(_squelches.pick_random())
+			else:
+				slime.slice(prev, p)
 			_knife_pts[event.index] = p
 			_knife_trail.add(p)
 		get_viewport().set_input_as_handled()
@@ -598,6 +808,7 @@ func _thumb_image() -> Image:
 
 
 class KnifeTrail extends Node2D:
+	var roller := false
 	var _pts := PackedVector2Array()
 	var _fade := 0.0
 	func begin(p: Vector2) -> void:
@@ -618,11 +829,18 @@ class KnifeTrail extends Node2D:
 	func _draw() -> void:
 		if _pts.size() < 2:
 			return
-		draw_polyline(_pts, Color(1, 1, 1, 0.75), 6.0, true)
 		var tip := _pts[_pts.size() - 1]
 		var dir := (tip - _pts[_pts.size() - 2]).normalized()
 		var n := Vector2(-dir.y, dir.x)
-		draw_colored_polygon(PackedVector2Array([tip + dir * 70, tip + n * 14 - dir * 10, tip - n * 14 - dir * 10]), Color("e6ebf3"))
+		if roller:
+			draw_set_transform(tip, dir.angle(), Vector2.ONE)
+			draw_rect(Rect2(Vector2(-18, -70), Vector2(36, 140)), Color("d9a46a"))
+			draw_rect(Rect2(Vector2(-10, -96), Vector2(20, 26)), Color("8a6a4a"))
+			draw_rect(Rect2(Vector2(-10, 70), Vector2(20, 26)), Color("8a6a4a"))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		else:
+			draw_polyline(_pts, Color(1, 1, 1, 0.75), 6.0, true)
+			draw_colored_polygon(PackedVector2Array([tip + dir * 70, tip + n * 14 - dir * 10, tip - n * 14 - dir * 10]), Color("e6ebf3"))
 
 
 # ---------------------------------------------------------------- settings

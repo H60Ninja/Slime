@@ -47,6 +47,7 @@ const STYLES := {
 @export var mix_rate := 0.03           ## colour blending per relax step (kneading mixes colours)
 @export var h_cap := 2.6               ## max thickness (peaks)
 @export var drop_px := 140.0           ## radius of a colour drop
+@export var max_growth := 2.4          ## the lump can grow to this many times its starting amount
 @export var stamp_px := 170.0          ## radius of a cookie-cutter stamp
 
 var color: Color = Color("6fe36a")     ## selected colour (used by drops and new lumps)
@@ -80,6 +81,8 @@ var _tmp := PackedFloat32Array()
 var _c := PackedFloat32Array()     # per cell: Kubelka-Munk K/S for r,g,b (paint-like mixing)
 var _ctmp := PackedFloat32Array()
 var _mass0 := 0.0
+var _mass_base := 0.0   # amount in a fresh lump; growth cap is relative to this
+var _undo: Array = []
 var _cell := Vector2(20, 20)
 var _fingers := {}  # index -> {pos, prev, ticks, still, moved}
 var _tick := 0
@@ -231,12 +234,70 @@ func reset() -> void:
 		_c[i * 3 + 1] = ks.y
 		_c[i * 3 + 2] = ks.z
 	_mass0 = _sum(_h)
+	_mass_base = _mass0
 	_fingers.clear()
 	_wobble = 1.0
 	if addins:
 		addins.clear()
 	if bubbles:
 		bubbles.clear()
+
+
+## Pour more slime (glue) onto the lump: a mound lands at the centroid and the whole
+## lump gets bigger. Capped at max_growth times a fresh lump. Returns false when full.
+func add_glue(amount := 0.18) -> bool:
+	if _mass0 >= _mass_base * max_growth - 0.001:
+		_wobble = 0.5
+		return false
+	var c := _centroid()
+	# footprint radius from the area that currently has slime, then a little beyond it
+	var cells := 0
+	for v in _h:
+		if v > 0.05:
+			cells += 1
+	var r := maxf(drop_px / _cell.x, sqrt(cells / PI) * 1.12)
+	var r2 := r * r
+	var want := _mass_base * amount
+	var x0 := maxi(0, int(c.x - r))
+	var x1 := mini(GW - 1, int(c.x + r) + 1)
+	var y0 := maxi(0, int(c.y - r))
+	var y1 := mini(GH - 1, int(c.y + r) + 1)
+	var wsum := 0.0
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var dx := x + 0.5 - c.x
+			var dy := y + 0.5 - c.y
+			var d2 := dx * dx + dy * dy
+			if d2 < r2:
+				var w := pow(1.0 - d2 / r2, 0.7)
+				wsum += w
+	if wsum <= 0.0:
+		return false
+	var per := want / wsum
+	var ks := to_ks(color)
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var dx := x + 0.5 - c.x
+			var dy := y + 0.5 - c.y
+			var d2 := dx * dx + dy * dy
+			if d2 < r2:
+				var w := pow(1.0 - d2 / r2, 0.7)
+				var i := y * GW + x
+				var add := per * w
+				var old := _h[i]
+				_h[i] = minf(h_cap, old + add)
+				# new glue carries the current colour; blend by how much it adds
+				var blend := add / maxf(0.001, old + add) * 0.8
+				_c[i * 3] = lerpf(_c[i * 3], ks.x, blend)
+				_c[i * 3 + 1] = lerpf(_c[i * 3 + 1], ks.y, blend)
+				_c[i * 3 + 2] = lerpf(_c[i * 3 + 2], ks.z, blend)
+	_mass0 = minf(_sum(_h), _mass_base * max_growth)
+	_wobble = 0.9
+	return true
+
+
+func growth() -> float:
+	return _mass0 / maxf(0.001, _mass_base)
 
 
 ## Pour a drop of the selected colour onto the lump (adds a little slime too).
@@ -343,6 +404,80 @@ func slice(a_px: Vector2, b_px: Vector2) -> bool:
 	return true
 
 
+## Undo: remember the lump before a gesture or tool, restore on request (8 deep).
+func remember() -> void:
+	_undo.append({"h": _h.duplicate(), "c": _c.duplicate(), "mass": _mass0, "addins": addins.get_state()})
+	if _undo.size() > 8:
+		_undo.pop_front()
+
+
+func can_undo() -> bool:
+	return not _undo.is_empty()
+
+
+func undo() -> bool:
+	if _undo.is_empty():
+		return false
+	var u: Dictionary = _undo.pop_back()
+	if u["h"].size() != _h.size():
+		return false
+	_h = u["h"]
+	_c = u["c"]
+	_mass0 = u["mass"]
+	addins.set_state(u["addins"])
+	bubbles.clear()
+	_wobble = 0.6
+	return true
+
+
+## Rolling pin: flatten a wide strip along the stroke; the squeezed-out slime piles up
+## on both sides. Returns true if anything moved.
+func roll(a_px: Vector2, b_px: Vector2) -> bool:
+	var a := to_grid_px(a_px)
+	var b := to_grid_px(b_px)
+	var half_w := 3.2
+	var reach := 6.0
+	var flat := 0.30
+	var x0 := maxi(0, int(minf(a.x, b.x) - reach) - 1)
+	var x1 := mini(GW - 1, int(maxf(a.x, b.x) + reach) + 1)
+	var y0 := maxi(0, int(minf(a.y, b.y) - reach) - 1)
+	var y1 := mini(GH - 1, int(maxf(a.y, b.y) + reach) + 1)
+	var removed := 0.0
+	var rim: Array = []
+	var rim_w := 0.0
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var q := Vector2(x + 0.5, y + 0.5)
+			var cp := Geometry2D.get_closest_point_to_segment(q, a, b)
+			var d := q.distance_to(cp)
+			var i := y * GW + x
+			if d < half_w:
+				if _h[i] > flat:
+					var take := (_h[i] - flat) * 0.6
+					_h[i] -= take
+					removed += take
+			elif d < reach and _h[i] > 0.01:
+				var t := 1.0 - absf(d - (half_w + 1.2)) / (reach - half_w)
+				if t > 0.0:
+					rim.append([i, t * t])
+					rim_w += t * t
+	if removed < 0.03:
+		return false
+	if rim_w > 0.0:
+		var per := removed / rim_w
+		for e in rim:
+			_h[e[0]] = minf(h_cap, _h[e[0]] + per * e[1])
+	# a rolling pin leaves a smooth strip: blur inside it
+	for y in range(maxi(1, y0), mini(GH - 2, y1) + 1):
+		for x in range(maxi(1, x0), mini(GW - 2, x1) + 1):
+			var q := Vector2(x + 0.5, y + 0.5)
+			if q.distance_to(Geometry2D.get_closest_point_to_segment(q, a, b)) < half_w:
+				var i := y * GW + x
+				var m := (_h[i - 1] + _h[i + 1] + _h[i - GW] + _h[i + GW]) * 0.25
+				_h[i] = lerpf(_h[i], m, 0.6)
+	return true
+
+
 ## Snapshot of the whole slime for the jar shelf.
 func get_state() -> Dictionary:
 	return {"gw": GW, "gh": GH, "h": _h.duplicate(), "c": _c.duplicate(), "color": color,
@@ -375,6 +510,15 @@ func _shape_polygon(shape: String, r: float) -> PackedVector2Array:
 			var x := 16.0 * pow(sin(t), 3.0)
 			var y := -(13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t))
 			pts.append(Vector2(x, y) / 16.0 * r)
+	elif shape == "circle":
+		for i in 32:
+			var a := TAU * i / 32.0
+			pts.append(Vector2(cos(a), sin(a)) * r * 0.85)
+	elif shape == "flower":
+		for i in 60:
+			var a := TAU * i / 60.0
+			var rr := r * (0.62 + 0.38 * absf(cos(2.5 * a)))
+			pts.append(Vector2(cos(a), sin(a)) * rr)
 	else:
 		for i in 10:
 			var rr := r if i % 2 == 0 else r * 0.45
@@ -476,6 +620,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var g := _to_grid(event.position)
 		if event.pressed:
 			var inside := _sample(g.x - 0.5, g.y - 0.5) > 0.05
+			if _fingers.is_empty():
+				remember()
 			_fingers[event.index] = {"pos": g, "prev": g, "still": 0, "held": false, "inside": inside}
 			touched.emit(inside)
 			if inside:
@@ -483,6 +629,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif _fingers.has(event.index):
 			var inside := _sample(g.x - 0.5, g.y - 0.5) > 0.05
 			_fingers.erase(event.index)
+			_pinch_prev = -1.0
 			released.emit(inside)
 		get_viewport().set_input_as_handled()
 	elif event is InputEventScreenDrag and _fingers.has(event.index):
@@ -527,6 +674,8 @@ func _physics_process(delta: float) -> void:
 		var k := press_rate * _press_mult * (1.0 - 0.55 * clampf(speed / 1.5, 0.0, 1.0))
 		_press(pos, rf, k)
 		addins.push_out(pos, rf)
+	if _fingers.size() == 2:
+		_pinch(rf)
 	_knead_speed = lerpf(_knead_speed, top_speed, 0.25)
 	kneading.emit(_knead_speed)
 	if _hue_drift > 0.0 and top_speed > 0.05:
@@ -543,6 +692,68 @@ func _physics_process(delta: float) -> void:
 			if absf(s - 1.0) > 0.0005:
 				for i in GW * GH:
 					_h[i] *= s
+
+
+## Two fingers closing on each other squeeze the slime between them up into a ridge.
+var _pinch_prev := -1.0
+func _pinch(rf: float) -> void:
+	var fs := _fingers.values()
+	var a: Vector2 = fs[0]["pos"]
+	var b: Vector2 = fs[1]["pos"]
+	var d := a.distance_to(b)
+	if _pinch_prev < 0.0:
+		_pinch_prev = d
+		return
+	var closing := _pinch_prev - d
+	_pinch_prev = d
+	if closing < 0.08 or d < rf * 1.5 or d > rf * 9.0:
+		return
+	var amount := minf(0.06, closing * 0.05)
+	var mid := (a + b) * 0.5
+	var moved := 0.0
+	for f in [a, b]:
+		moved += _take(f, rf * 1.1, amount)
+	_deposit(mid, rf * 0.9 + d * 0.08, moved)
+
+
+func _take(c: Vector2, r: float, k: float) -> float:
+	var r2 := r * r
+	var got := 0.0
+	for y in range(maxi(0, int(c.y - r)), mini(GH - 1, int(c.y + r) + 1) + 1):
+		for x in range(maxi(0, int(c.x - r)), mini(GW - 1, int(c.x + r) + 1) + 1):
+			var dx := x + 0.5 - c.x
+			var dy := y + 0.5 - c.y
+			var d2 := dx * dx + dy * dy
+			if d2 < r2:
+				var i := y * GW + x
+				var t := _h[i] * k * (1.0 - d2 / r2)
+				_h[i] -= t
+				got += t
+	return got
+
+
+func _deposit(c: Vector2, r: float, amount: float) -> void:
+	var r2 := r * r
+	var wsum := 0.0
+	for y in range(maxi(0, int(c.y - r)), mini(GH - 1, int(c.y + r) + 1) + 1):
+		for x in range(maxi(0, int(c.x - r)), mini(GW - 1, int(c.x + r) + 1) + 1):
+			var dx := x + 0.5 - c.x
+			var dy := y + 0.5 - c.y
+			var d2 := dx * dx + dy * dy
+			if d2 < r2:
+				var w := 1.0 - d2 / r2
+				wsum += w * w
+	if wsum <= 0.0:
+		return
+	for y in range(maxi(0, int(c.y - r)), mini(GH - 1, int(c.y + r) + 1) + 1):
+		for x in range(maxi(0, int(c.x - r)), mini(GW - 1, int(c.x + r) + 1) + 1):
+			var dx := x + 0.5 - c.x
+			var dy := y + 0.5 - c.y
+			var d2 := dx * dx + dy * dy
+			if d2 < r2:
+				var w := 1.0 - d2 / r2
+				var i := y * GW + x
+				_h[i] = minf(h_cap, _h[i] + amount * w * w / wsum)
 
 
 ## Push slime down under the finger and out to a rim around it (mass conserving).
@@ -653,7 +864,8 @@ func _relax(d: float) -> void:
 			var i := row + x
 			var c := _tmp[i]
 			var lap := _tmp[i - 1] + _tmp[i + 1] + _tmp[i - GW] + _tmp[i + GW] - 4.0 * c
-			_h[i] = maxf(0.0, c + d * lap)
+			# thick slime slumps faster than a thin smear (gravity has more to pull on)
+			_h[i] = maxf(0.0, c + d * (0.35 + 0.65 * minf(1.0, c)) * lap)
 
 
 ## Colours blend into their neighbours where there is slime (kneading mixes them).

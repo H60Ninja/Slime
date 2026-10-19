@@ -25,7 +25,9 @@ slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like
   holographic and colour-changing magic slime — plus sparkle
 - Six themed slimes in one tap: ice cream, unicorn, galaxy, rainbow, lemonade, mint
 - Scented slime: strawberry, lemon, blueberry, mint, chocolate or bubblegum puffs
-- Slice it with the knife and watch it heal
+- Pour in more glue and watch the lump grow; squeeze it between two fingers into ridges
+- Slice it with the knife, flatten it with the rolling pin, undo if you change your mind
+- Stamp stars, hearts, circles and flowers
 - Keep up to six slimes in jars on the shelf and come back to them
 - Make your own slime first: pour the glue, pick a colour, add activator, stir it up
 - Camera button saves your creation to the tablet's Pictures to show a grown-up
@@ -78,7 +80,7 @@ never be updated under this package name.
 1. Real molding physics: craters, strands, ridges, peaks — it keeps your shape
 2. Ten slime kinds, each with its own sound; pour and swirl colours like paint
 3. Make your own slime first: glue, colour, activator, stir
-4. Beads, stars, stamps, a knife, and jars to save your favourites
+4. Glue to grow it, beads, stars, four stamps, a knife, a rolling pin, undo, and jars
 5. No ads, no purchases, no internet, nothing to read
 
 ## Amazon Appstore submission steps (see docs/amazon-submission.md for the field-by-field version)

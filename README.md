@@ -12,10 +12,19 @@ Left column = slime kind: shiny · clear · metal · cloud · crunchy · butter 
 glow-in-the-dark (lights go off) · holographic · magic (colour changes as you knead).
 Bottom row = new lump · bowl (make slime from scratch) · themes (ice cream, unicorn,
 galaxy, rainbow, lemonade, mint: one tap sets colours, kind, add-ins and scent) · sparkle ·
-beads · stars · star stamp · heart stamp · knife (drag to slice) · camera (saves to the
-tablet's Pictures) · jars (shelf of six: tap an empty jar to save, a full one to reopen,
-hold to overwrite) · scent (strawberry, lemon, blueberry, mint, chocolate, bubblegum: little
-puffs rise where you touch). Every kind has its own voice when you touch it (watery jelly, metallic tang, muffled cloud, low buttery smear, glowing hum, glassy holographic sparkle, magic twinkle, crackle, poof) and colours the shared squelch, stretch and pop by pitch. A wet kneading sound follows how fast you move. Works in
+glue (pour more slime in; the lump grows up to 2.4× its starting size) · sprinkles
+(beads, stars) · stamps (star, heart, circle, flower) · knife (drag to slice) · rolling pin
+(drag to flatten a strip) · undo (eight steps) · camera (saves to the tablet's Pictures) ·
+jars (shelf of six: tap an empty jar to save, a full one to reopen, hold to overwrite) ·
+scent (strawberry, lemon, blueberry, mint, chocolate, bubblegum: little puffs rise where
+you touch). Two fingers closing on the slime squeeze it up into a ridge between them;
+thick slime slumps faster than a thin smear.
+
+**Slime Shop (not live yet):** `scripts/store.gd` holds a one-time unlock (planned ~99¢)
+with four extra themes and rainbow sprinkles. Premium tiles are hidden entirely until a
+billing plugin is wired in (`available()` returns false), so the shipped app is complete
+and clean. When billing lands: locked tiles show a lock badge, tapping one opens a
+hold-the-lock-for-3-seconds parental gate (`scripts/gate.gd`), then the purchase. Every kind has its own voice when you touch it (watery jelly, metallic tang, muffled cloud, low buttery smear, glowing hum, glassy holographic sparkle, magic twinkle, crackle, poof) and colours the shared squelch, stretch and pop by pitch. A wet kneading sound follows how fast you move. Works in
 landscape and portrait; Android back closes overlays instead of quitting.
 
 **First run** is a guided make-slime opening: a cartoon hand shows what to tap, the four

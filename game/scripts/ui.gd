@@ -6,8 +6,11 @@ class_name SlimeUI
 signal color_picked(c: Color, from: Vector2)
 signal style_picked(style: String)
 signal sparkle_toggled(on: bool)
-signal addin_pressed(kind: int)
-signal stamp_pressed(shape: String)
+signal sprinkles_pressed
+signal stamps_pressed
+signal glue_pressed
+signal roller_toggled(on: bool)
+signal undo_pressed
 signal reset_pressed
 signal snapshot_pressed
 signal knife_toggled(on: bool)
@@ -31,7 +34,7 @@ const PALETTE: Array[Color] = [
 const STYLES := ["shiny", "clear", "metal", "cloud", "crunchy", "butter", "fluffy", "glow", "holo", "magic"]
 const DOT := 88.0
 
-enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART, CRUNCHY, BUTTER, FLUFFY, CAMERA, GLOW, HOLO, MAGIC, KNIFE, JARS, BOWL, THEMES, SCENTS }
+enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART, CRUNCHY, BUTTER, FLUFFY, CAMERA, GLOW, HOLO, MAGIC, KNIFE, JARS, BOWL, THEMES, SCENTS, GLUE, ROLLER, UNDO }
 const STYLE_ICONS := [Icon.SHINY, Icon.CLEAR, Icon.METAL, Icon.CLOUD, Icon.CRUNCHY, Icon.BUTTER, Icon.FLUFFY, Icon.GLOW, Icon.HOLO, Icon.MAGIC]
 
 var _buttons: Array[Button] = []
@@ -41,6 +44,9 @@ var _style := 0
 var _sparkle := false
 var _spark_btn: Button
 var _knife_btn: Button
+var _roller_btn: Button
+var _roller := false
+var _undo_btn: Button
 var _knife := false
 var _palette: VBoxContainer
 var _styles_col: VBoxContainer
@@ -119,29 +125,32 @@ func _ready() -> void:
 	row.add_child(_spark_btn)
 
 	row.add_child(_spacer())
-	var beads := _round_button(Color.WHITE)
-	beads.add_child(_icon(Icon.BEADS))
-	beads.pressed.connect(func(): addin_pressed.emit(0))
-	row.add_child(beads)
-	var stars := _round_button(Color.WHITE)
-	stars.add_child(_icon(Icon.STARS))
-	stars.pressed.connect(func(): addin_pressed.emit(1))
-	row.add_child(stars)
+	var glue := _round_button(Color.WHITE)
+	glue.add_child(_icon(Icon.GLUE))
+	glue.pressed.connect(func(): glue_pressed.emit())
+	row.add_child(glue)
+	var sprinkles := _round_button(Color.WHITE)
+	sprinkles.add_child(_icon(Icon.BEADS))
+	sprinkles.pressed.connect(func(): sprinkles_pressed.emit())
+	row.add_child(sprinkles)
+	var stamps := _round_button(Color.WHITE)
+	stamps.add_child(_icon(Icon.STAMP_STAR))
+	stamps.pressed.connect(func(): stamps_pressed.emit())
+	row.add_child(stamps)
 
 	row.add_child(_spacer())
-	var st := _round_button(Color.WHITE)
-	st.add_child(_icon(Icon.STAMP_STAR))
-	st.pressed.connect(func(): stamp_pressed.emit("star"))
-	row.add_child(st)
-	var ht := _round_button(Color.WHITE)
-	ht.add_child(_icon(Icon.STAMP_HEART))
-	ht.pressed.connect(func(): stamp_pressed.emit("heart"))
-	row.add_child(ht)
-
 	_knife_btn = _round_button(Color.WHITE)
 	_knife_btn.add_child(_icon(Icon.KNIFE))
 	_knife_btn.pressed.connect(_on_knife)
 	row.add_child(_knife_btn)
+	_roller_btn = _round_button(Color.WHITE)
+	_roller_btn.add_child(_icon(Icon.ROLLER))
+	_roller_btn.pressed.connect(_on_roller)
+	row.add_child(_roller_btn)
+	_undo_btn = _round_button(Color.WHITE)
+	_undo_btn.add_child(_icon(Icon.UNDO))
+	_undo_btn.pressed.connect(func(): undo_pressed.emit())
+	row.add_child(_undo_btn)
 
 	row.add_child(_spacer())
 	var cam := _round_button(Color.WHITE)
@@ -249,6 +258,7 @@ func _refresh_selection() -> void:
 		_set_ring(_style_buttons[i], Color.WHITE, i == _style, Color("4fb8ff"))
 	_set_ring(_spark_btn, Color.WHITE, _sparkle, Color("ffd84d"))
 	_set_ring(_knife_btn, Color.WHITE, _knife, Color("ff6b6b"))
+	_set_ring(_roller_btn, Color.WHITE, _roller, Color("c58bff"))
 	_set_ring(_scent_btn, Color.WHITE, _scent_kind != "", Color("ff8fcf"))
 
 
@@ -276,13 +286,38 @@ func _on_style(i: int) -> void:
 
 func set_knife(on: bool) -> void:
 	_knife = on
+	if on:
+		_roller = false
 	_refresh_selection()
+
+
+func set_roller(on: bool) -> void:
+	_roller = on
+	if on:
+		_knife = false
+	_refresh_selection()
+
+
+func set_undo_enabled(on: bool) -> void:
+	_undo_btn.modulate.a = 1.0 if on else 0.4
 
 
 func _on_knife() -> void:
 	_knife = not _knife
+	if _knife and _roller:
+		_roller = false
+		roller_toggled.emit(false)
 	_refresh_selection()
 	knife_toggled.emit(_knife)
+
+
+func _on_roller() -> void:
+	_roller = not _roller
+	if _roller and _knife:
+		_knife = false
+		knife_toggled.emit(false)
+	_refresh_selection()
+	roller_toggled.emit(_roller)
 
 
 func _on_sparkle() -> void:
@@ -427,6 +462,21 @@ class IconControl extends Control:
 				draw_set_transform(c, 0.0, Vector2.ONE)
 				ScentDraw.draw_icon(self, "strawberry", 0.95)
 				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			22:  # GLUE: white bottle with orange label, drip
+				draw_rect(Rect2(c + Vector2(-16, -10), Vector2(32, 38)), Color("f2f2f6"))
+				draw_rect(Rect2(c + Vector2(-7, -26), Vector2(14, 16)), Color("ff9b2f"))
+				draw_rect(Rect2(c + Vector2(-12, 2), Vector2(24, 14)), Color("ff9b2f"))
+				draw_circle(c + Vector2(0, 32), 5, Color("f2f2f6"))
+			23:  # ROLLER: rolling pin
+				draw_set_transform(c, -0.6, Vector2.ONE)
+				draw_rect(Rect2(Vector2(-24, -9), Vector2(48, 18)), Color("d9a46a"))
+				draw_rect(Rect2(Vector2(-36, -5), Vector2(12, 10)), Color("8a6a4a"))
+				draw_rect(Rect2(Vector2(24, -5), Vector2(12, 10)), Color("8a6a4a"))
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			24:  # UNDO: curved arrow
+				draw_arc(c + Vector2(2, 2), 20, PI * 0.15, PI * 1.55, 24, Color("5a6478"), 8.0, true)
+				var tip := c + Vector2(2, 2) + Vector2(cos(PI * 1.55), sin(PI * 1.55)) * 20
+				draw_colored_polygon(PackedVector2Array([tip + Vector2(-14, -2), tip + Vector2(4, -16), tip + Vector2(8, 4)]), Color("5a6478"))
 			13:  # CAMERA
 				var body := Rect2(c + Vector2(-26, -14), Vector2(52, 36))
 				draw_rect(body, Color("5a6478"))

@@ -3,6 +3,7 @@ extends CanvasLayer
 ## callable. Tap a tile to pick it, tap outside or the X to close.
 
 signal picked(id: String)
+signal locked_picked(id: String)
 signal closed
 
 var _items: Array = []   # {id, draw: Callable(canvas: CanvasItem, rect: Rect2)}
@@ -25,6 +26,12 @@ func setup(items: Array, cols := 4) -> void:
 	_board = Board.new()
 	_board.picker = self
 	add_child(_board)
+
+
+func set_items(items: Array) -> void:
+	_items = items
+	if _board:
+		_board.queue_redraw()
 
 
 func open(selected := "") -> void:
@@ -71,6 +78,10 @@ func _on_input(ev: InputEvent) -> void:
 		var rs := rects()
 		for i in rs.size():
 			if rs[i].grow(8).has_point(pos):
+				if _items[i].get("locked", false):
+					locked_picked.emit(_items[i]["id"])
+					close()
+					return
 				_selected = _items[i]["id"]
 				picked.emit(_selected)
 				close()
@@ -97,6 +108,11 @@ class Board extends Node2D:
 				sb.set_border_width_all(8)
 			draw_style_box(sb, r)
 			picker._items[i]["draw"].call(self, r.grow(-18))
+			if picker._items[i].get("locked", false):
+				var b := r.position + Vector2(r.size.x - 46, 46)
+				draw_circle(b, 34, Color("ffd84d"))
+				draw_rect(Rect2(b + Vector2(-13, -2), Vector2(26, 20)), Color("5a6478"))
+				draw_arc(b + Vector2(0, -4), 9, PI, TAU, 12, Color("5a6478"), 5.0, true)
 		# close X
 		var c: Rect2 = picker.close_rect()
 		var sbx := StyleBoxFlat.new()

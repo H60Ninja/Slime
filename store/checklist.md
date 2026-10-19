@@ -37,6 +37,13 @@ Tick in order. Everything in **bold** needs Adam personally.
 - [ ] Grow → **Teacher Approved opt-in** on day one.
 - [ ] On the tablet: Kids Space → Parent menu → Add more apps → Slime.
 
+## In-app purchase (later, v1.1)
+- [ ] Decide price (~$0.99) and SKU id (`slime_shop_unlock`).
+- [ ] Amazon: integrate Amazon Appstore SDK (IAP) as a Godot Android plugin; add payment + tax info in the developer profile; create the IAP item in the console.
+- [ ] Google: integrate Play Billing plugin; create the one-time product.
+- [ ] Flip `store.gd available()` to query the plugin; keep the parental gate.
+- [ ] Re-answer Amazon content rating "purchases: yes" and Play IAP declaration; keep "no ads".
+
 ## Store-review gotchas to pre-empt
 - "App contains no text" is fine; reviewers may ask for a short description of controls — it's in listing.md.
 - Snapshot writes to Pictures via MediaStore (no permission). If a reviewer asks: "saves a picture the child made to the device gallery; nothing leaves the device".
