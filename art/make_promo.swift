@@ -16,7 +16,7 @@ func text(_ s: String, _ pt: CGFloat, _ color: NSColor, _ x: CGFloat, _ y: CGFlo
 }
 // AppKit y is bottom-up. Keep all text >= 50px from edges.
 text("Slime", 150, NSColor(red: 0.17, green: 0.18, blue: 0.26, alpha: 1), 560, 240, bold: true)
-text("no ads · no purchases", 44, NSColor(red: 0.35, green: 0.39, blue: 0.47, alpha: 1), 566, 180, bold: false)
+text("no ads · no purchases", 36, NSColor(red: 0.35, green: 0.39, blue: 0.47, alpha: 1), 572, 186, bold: false)
 img.unlockFocus()
 guard let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
       let png = rep.representation(using: .png, properties: [:]) else { fatalError("encode") }
