@@ -15,7 +15,7 @@ export GODOT_ANDROID_KEYSTORE_RELEASE_PATH     = $(HOME)/.android/slime-release.
 export GODOT_ANDROID_KEYSTORE_RELEASE_USER     = slime
 export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD = $(shell security find-generic-password -s slime-release-keystore -w)
 
-.PHONY: run-mac android-template export-apk export-apk-release export-aab emu-fire emu-kids install run-fire run-device logs stop
+.PHONY: run-mac android-template export-apk export-apk-release export-aab export-windows emu-fire emu-kids install run-fire run-device logs stop
 
 run-mac:            ## run the game on the Mac (fastest iteration)
 	$(GODOT) --path game
@@ -30,6 +30,9 @@ android-template:   ## (one-time) install Godot's Gradle build template into gam
 
 export-apk-release: ## release-signed APK for the Amazon Appstore
 	mkdir -p build && $(GODOT) --headless --path game --export-release "Android APK" ../$(APK_REL)
+
+export-windows:     ## single-file Windows build in build/windows/
+	mkdir -p build/windows && $(GODOT) --headless --path game --export-release "Windows Desktop" ../build/windows/Squish-Slime.exe
 
 export-aab:         ## release-signed AAB for Google Play (Gradle build; first run downloads Gradle)
 	mkdir -p build && $(GODOT) --headless --path game --export-release "Android AAB" ../$(AAB)
