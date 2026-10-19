@@ -145,6 +145,7 @@ if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "game/icons"
     store = sys.argv[2] if len(sys.argv) > 2 else "store"
     os.makedirs(out, exist_ok=True); os.makedirs(store, exist_ok=True)
+    png(os.path.join(out, "icon_114.png"), 114, 114, render(114, 114, 4, icon_paint(114, True)))
     png(os.path.join(out, "icon_192.png"), 192, 192, render(192, 192, 3, icon_paint(192, True)))
     png(os.path.join(out, "icon_512.png"), 512, 512, render(512, 512, 2, icon_paint(512, True)))
     png(os.path.join(out, "fg_432.png"), 432, 432, render(432, 432, 2, icon_paint(432, False)))

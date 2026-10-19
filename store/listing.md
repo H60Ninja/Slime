@@ -62,8 +62,8 @@ https://h60ninja.github.io/Slime/privacy   (publish `docs/privacy.md` via GitHub
 or paste the raw GitHub URL of docs/privacy.md — both stores accept any public URL).
 
 ## Assets
-- Icon 512×512: `game/icons/icon_512.png`
-- Feature graphic 1024×500 (Google): `store/feature-graphic.png`
+- Icons: 114×114 `game/icons/icon_114.png` (Amazon small), 512×512 `game/icons/icon_512.png`
+- Feature graphic 1024×500 (Google): `store/feature-graphic.png`; Amazon promotional image (needs the app name): `store/promo-1024x500.png`
 - Screenshots 1920×1200: `store/screenshots/*.png` (both stores accept landscape tablet
   shots).
 
@@ -74,7 +74,14 @@ Both are signed with `~/.android/slime-release.jks` (password in the macOS Keych
 service `slime-release-keystore`). **Back that keystore up** — losing it means the app can
 never be updated under this package name.
 
-## Amazon Appstore submission steps
+## Amazon product feature bullets (3–5 lines)
+1. Real molding physics: craters, strands, ridges, peaks — it keeps your shape
+2. Ten slime kinds, each with its own sound; pour and swirl colours like paint
+3. Make your own slime first: glue, colour, activator, stir
+4. Beads, stars, stamps, a knife, and jars to save your favourites
+5. No ads, no purchases, no internet, nothing to read
+
+## Amazon Appstore submission steps (see docs/amazon-submission.md for the field-by-field version)
 1. developer.amazon.com → sign in with the personal (H60Ninja) Amazon account → Apps &
    Services → Add New App → Android.
 2. General information: title, category Games/Kids, customer support email.

@@ -11,7 +11,7 @@
 | 3b Research round | ✅ 2026-10-18 — speed-responsive wet loop, glow/holo/magic kinds, knife, jar shelf (6 saves), listing rewritten around "no ads / sensory". See `docs/market-research.md` |
 | 3c UX + release prep | ✅ 2026-10-18 — guided opening (hand cue, step icons, colour bottles under the bowl, go button, chrome hidden), themed sets, scented puffs, press bounce, Android back handling, first-touch hint, v1.0.0 / versionCode 2, `store/checklist.md` |
 | 4 Polish | ✅ v2 — make-slime ritual on first run, 7 kinds (crunchy/butter/fluffy added with own sounds), snapshot to Pictures via MediaStore, portrait + landscape, generated icon + feature graphic, privacy page, 6 store screenshots. **Not yet tested on a real Fire tablet** |
-| 5 Amazon | ⏳ ready to submit: `build/slime-release.apk` (release-signed, targetSdk 36). Needs Adam's Amazon developer account |
+| 5 Amazon | ⏳ ready to submit: `build/slime-release.apk`, all assets, field-by-field guide in `docs/amazon-submission.md`. Needs Adam: developer account, ID verification, a physical-device test |
 | 6 Google | ⏳ ready to upload: `build/slime-release.aab`. Needs Adam's Play account + 12 testers |
 | 7 Maint. | — |
 

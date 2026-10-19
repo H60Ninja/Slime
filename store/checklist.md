@@ -17,11 +17,15 @@ Tick in order. Everything in **bold** needs Adam personally.
 - [x] Listing text `store/listing.md`. Privacy policy `docs/privacy.md`.
 - [ ] **Privacy policy URL.** Both stores need a public URL. Options: make the GitHub repo public and turn on GitHub Pages (docs/ folder), or paste the policy into a public Gist. Decide, then put the URL in listing.md.
 
-## Amazon Appstore (Fire tablets)
+## Amazon Appstore (Fire tablets) — full walkthrough in `docs/amazon-submission.md`
 - [ ] **Create developer account** (free) at developer.amazon.com with the personal Amazon login.
-- [ ] Add New App → Android → upload `slime-release.apk`.
-- [ ] Category Games › Kids. Content rating: no violence/no ads/no data. Child-directed: yes (COPPA attestation).
-- [ ] Device support: Fire tablets only. Screenshots + promo image + icon.
+- [ ] **Identity verification**: photos of the account owner's government ID, name matching the Company Profile.
+- [ ] **Physical device test** (required by Amazon's presubmission checklist).
+- [x] Binary: zip-aligned, arm64 + armeabi-v7a, targetSdk 36, minSdk 24, versionCode 2.
+- [x] Assets: 114 and 512 icons, 10 screenshots at 1920×1200, promo 1024×500 with the app name.
+- [ ] Add New App → Android → upload `build/slime-release.apk`. Category Kids › Games › Simulation.
+- [ ] Target: Fire tablets only (untick Fire TV/Automotive). Audience: children 0–12. Content rating: all None/No. User data privacy: **No**.
+- [ ] Appstore Details: title, short/long description, 3–5 feature bullets, keywords (all in `store/listing.md`), images.
 - [ ] Submit; review 1–3 days. Then share into each child profile (Settings → Profiles & Family Library → child → Add Content).
 
 ## Google Play (Kids Space tablets)
