@@ -1,22 +1,48 @@
 #!/usr/bin/env python3
-"""Generate the game's sound effects as 16-bit mono WAVs. Pure stdlib, deterministic.
+"""Generate the game's sound effects as 16-bit WAVs. Pure stdlib, deterministic.
 
     python3 art/make_sfx.py game/assets/sfx
+
+Design notes (from the 2026-10-18 research pass, see docs/market-research.md):
+- ASMR "tingle" tracks energy around 5 kHz in short, repeated transients, so every wet
+  sound carries a sticky-click layer: dense clusters of 3-15 ms resonant bursts at 2-6 kHz.
+- Real slime foley is built in layers: a wet squelch body (noise through a modulated
+  band-pass and a comb filter), separate sharp pops, and fine crackle; here each sound
+  is mixed from those same layers.
+- A sticky release is a resonant burst whose centre frequency falls fast, followed by a
+  faint delayed tail (the two surfaces letting go).
+- Variation beats fidelity: each family has several variants and the game adds pitch
+  randomisation on top, so nothing repeats exactly.
 """
-import math, random, struct, sys, wave, os
+import math, os, random, struct, sys, wave
 
 SR = 44100
 
-def write(path, samples):
-    peak = max(1e-6, max(abs(s) for s in samples))
-    norm = 0.9 / peak
+
+# ---------------------------------------------------------------- DSP helpers
+
+def write(path, samples, stereo=None):
+    """samples: mono list in [-1,1]. stereo: optional (L, R) lists."""
+    if stereo is not None:
+        L, R = stereo
+        peak = max(1e-6, max(max(abs(s) for s in L), max(abs(s) for s in R)))
+        norm = 0.92 / peak
+        frames = b"".join(struct.pack("<hh", int(max(-1, min(1, L[i] * norm)) * 32767), int(max(-1, min(1, R[i] * norm)) * 32767)) for i in range(len(L)))
+        ch = 2
+        n = len(L)
+    else:
+        peak = max(1e-6, max(abs(s) for s in samples))
+        norm = 0.92 / peak
+        frames = b"".join(struct.pack("<h", int(max(-1, min(1, s * norm)) * 32767)) for s in samples)
+        ch = 1
+        n = len(samples)
     with wave.open(path, "wb") as w:
-        w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
-        w.writeframes(b"".join(struct.pack("<h", int(max(-1, min(1, s * norm)) * 32767)) for s in samples))
-    print("wrote", path, f"{len(samples)/SR:.2f}s")
+        w.setnchannels(ch); w.setsampwidth(2); w.setframerate(SR)
+        w.writeframes(frames)
+    print("wrote", os.path.basename(path), f"{n / SR:.2f}s", "stereo" if ch == 2 else "mono")
+
 
 def lowpass(xs, cutoff_fn):
-    """One-pole lowpass with a per-sample cutoff (Hz)."""
     y, out = 0.0, []
     for i, x in enumerate(xs):
         a = 1 - math.exp(-2 * math.pi * cutoff_fn(i) / SR)
@@ -24,93 +50,291 @@ def lowpass(xs, cutoff_fn):
         out.append(y)
     return out
 
-def env(n, attack, decay_pow=2.0):
+
+def highpass(xs, cutoff):
+    a = math.exp(-2 * math.pi * cutoff / SR)
+    out, prev_x, prev_y = [], 0.0, 0.0
+    for x in xs:
+        y = a * (prev_y + x - prev_x)
+        out.append(y); prev_x, prev_y = x, y
+    return out
+
+
+def bandpass(xs, freq_fn, q=6.0):
+    """Biquad band-pass with a per-sample centre frequency (state-variable form)."""
+    out = []
+    lp = bp = 0.0
+    for i, x in enumerate(xs):
+        f = 2 * math.sin(math.pi * min(freq_fn(i), SR * 0.45) / SR)
+        hp = x - lp - bp / q
+        bp += f * hp
+        lp += f * bp
+        out.append(bp)
+    return out
+
+
+def comb(xs, delay_fn, feedback=0.6, mix=0.5):
+    """Feedback comb with a per-sample delay (samples). The 'squish engine' core."""
+    buf = [0.0] * 4096
+    out = []
+    w = 0
+    for i, x in enumerate(xs):
+        d = max(1.0, min(4000.0, delay_fn(i)))
+        r = (w - d) % 4096
+        i0 = int(r); fr = r - i0
+        y = buf[i0] * (1 - fr) + buf[(i0 + 1) % 4096] * fr
+        v = x + y * feedback
+        buf[w] = v
+        w = (w + 1) % 4096
+        out.append(x * (1 - mix) + y * mix)
+    return out
+
+
+def env(n, attack, decay_pow=2.0, hold=0.0):
     out = []
     for i in range(n):
         t = i / n
         a = min(1.0, i / max(1, attack))
-        out.append(a * (1 - t) ** decay_pow)
+        d = 1.0 if t < hold else (1 - (t - hold) / (1 - hold)) ** decay_pow
+        out.append(a * d)
     return out
+
+
+def mix(*layers):
+    n = max(len(l) for l in layers)
+    out = [0.0] * n
+    for l in layers:
+        for i, v in enumerate(l):
+            out[i] += v
+    return out
+
+
+def gain(xs, g):
+    return [x * g for x in xs]
+
+
+def fade_edges(xs, ms=4):
+    n = len(xs); f = int(SR * ms / 1000)
+    for i in range(min(f, n)):
+        k = i / f
+        xs[i] *= k
+        xs[n - 1 - i] *= k
+    return xs
+
+
+# ---------------------------------------------------------------- layers
+
+def sticky_clicks(rnd, n, density, f_lo=2200, f_hi=6000, amp=1.0, shape=None):
+    """Clusters of tiny resonant bursts: the 'sticky' high-frequency detail.
+    density: expected clicks per second (callable of i or float). shape: amplitude fn of i."""
+    out = [0.0] * n
+    i = 0
+    while i < n:
+        d = density(i) if callable(density) else density
+        gap = int(SR / max(1.0, d) * rnd.uniform(0.35, 1.65))
+        i += max(40, gap)
+        if i >= n:
+            break
+        ln = rnd.randint(int(SR * 0.003), int(SR * 0.014))
+        f = rnd.uniform(f_lo, f_hi)
+        a = amp * rnd.uniform(0.35, 1.0) * (shape(i) if shape else 1.0)
+        q = rnd.uniform(5.0, 14.0)
+        burst = [rnd.uniform(-1, 1) for _ in range(ln)]
+        burst = bandpass(burst, lambda k, f=f, ln=ln: f * (1 - 0.25 * k / ln), q)
+        e = env(ln, SR * 0.0004, 2.2)
+        for k in range(ln):
+            if i + k < n:
+                out[i + k] += burst[k] * e[k] * a * 2.2
+    return out
+
+
+def wet_body(rnd, n, cut_fn, comb_delay_fn, amp=1.0):
+    """Noise through a wandering band-pass + comb: the gooey mid-range squelch body."""
+    noise = [rnd.uniform(-1, 1) for _ in range(n)]
+    bp = bandpass(noise, cut_fn, 2.2)
+    c = comb(bp, comb_delay_fn, feedback=0.72, mix=0.55)
+    return gain(c, amp)
+
+
+def thump(n, f0, f1, amp=0.6):
+    out = []
+    ph = 0.0
+    for i in range(n):
+        f = f0 + (f1 - f0) * i / n
+        ph += 2 * math.pi * f / SR
+        out.append(math.sin(ph) * amp)
+    return out
+
+
+def release_tail(rnd, start_f, end_f, dur, amp=1.0, tail_delay=0.035):
+    """Sticky let-go: resonant burst falling in frequency, then a faint delayed echo."""
+    n = int(SR * dur)
+    noise = [rnd.uniform(-1, 1) for _ in range(n)]
+    b = bandpass(noise, lambda i: start_f + (end_f - start_f) * (i / n) ** 0.6, 9.0)
+    e = env(n, SR * 0.001, 3.0)
+    main = [b[i] * e[i] * amp for i in range(n)]
+    d = int(SR * tail_delay)
+    out = main + [0.0] * d
+    for i in range(n):
+        out[i + d] += main[i] * 0.32
+    return out
+
+
+def bubble(rnd, f0, dur, amp=1.0):
+    n = int(SR * dur)
+    out = []
+    ph = 0.0
+    for i in range(n):
+        k = i / n
+        f = f0 * (1 + 0.9 * k * k)          # pitch rises as the bubble thins
+        ph += 2 * math.pi * f / SR
+        e = (1 - k) ** 2.6 * min(1.0, i / (SR * 0.0008))
+        out.append(math.sin(ph) * e * amp)
+    # tiny click at the burst
+    cl = int(SR * 0.004)
+    for i in range(cl):
+        out[i] += rnd.uniform(-1, 1) * (1 - i / cl) ** 3 * 0.5 * amp
+    return out
+
+
+# ---------------------------------------------------------------- sounds
 
 def squish(seed):
+    """Finger lands on slime: soft thump, wet body that builds then tears, clicks."""
     rnd = random.Random(seed)
-    n = int(SR * 0.22)
-    noise = [rnd.uniform(-1, 1) for _ in range(n)]
-    wet = lowpass(noise, lambda i: 1800 * (1 - i / n) + 250)
-    e = env(n, SR * 0.004, 1.6)
-    thump = [0.6 * math.sin(2 * math.pi * (95 - 40 * i / n) * i / SR) for i in range(n)]
-    return [(wet[i] * 1.2 + thump[i]) * e[i] for i in range(n)]
+    n = int(SR * 0.30)
+    body = wet_body(rnd, n,
+                    lambda i: 380 + 900 * (0.5 + 0.5 * math.sin(2 * math.pi * 7 * i / SR)) * (1 - i / n),
+                    lambda i: 60 + 50 * math.sin(2 * math.pi * 3.1 * i / SR + seed), 1.0)
+    e_body = env(n, SR * 0.018, 1.8)            # pressure builds over ~18 ms (foley note)
+    body = [body[i] * e_body[i] for i in range(n)]
+    clicks = sticky_clicks(rnd, n, lambda i: 140 * (1 - i / n) + 20, amp=0.55,
+                           shape=lambda i: min(1.0, i / (SR * 0.01)))
+    th = [v * env(n, SR * 0.002, 3.5)[i] for i, v in enumerate(thump(n, 110, 60, 0.7))]
+    rel = release_tail(rnd, 2600, 700, 0.07, 0.45)
+    out = mix(body, clicks, th)
+    for i, v in enumerate(rel):
+        j = int(SR * 0.16) + i
+        if j < n:
+            out[j] += v
+    return fade_edges(out)
+
 
 def pop(seed):
-    n = int(SR * 0.09)
-    e = env(n, SR * 0.001, 3.0)
-    return [math.sin(2 * math.pi * (650 - 420 * i / n) * i / SR) * e[i] for i in range(n)]
-
-def slurp(seed):
+    """Finger lifts off: sharp sticky release with a little suction."""
     rnd = random.Random(seed)
-    n = int(SR * 0.35)
-    noise = [rnd.uniform(-1, 1) for _ in range(n)]
-    wet = lowpass(noise, lambda i: 300 + 2200 * (i / n))
-    e = [math.sin(math.pi * i / n) ** 1.5 for i in range(n)]
-    return [wet[i] * e[i] for i in range(n)]
+    rel = release_tail(rnd, 3400 + rnd.uniform(-600, 600), 500, 0.11, 1.0)
+    n = len(rel)
+    suck = wet_body(rnd, n, lambda i: 900 - 500 * i / n, lambda i: 40 + 30 * i / n, 0.4)
+    suck = [suck[i] * env(n, SR * 0.001, 2.5)[i] for i in range(n)]
+    clicks = sticky_clicks(rnd, n, lambda i: 260 * (1 - i / n), amp=0.6)
+    return fade_edges(mix(rel, suck, clicks))
+
 
 def squelch(seed):
+    """Finger held down and wiggled: long gooey kneading squelch."""
     rnd = random.Random(seed)
-    n = int(SR * 0.38)
-    noise = [rnd.uniform(-1, 1) for _ in range(n)]
-    wet = lowpass(noise, lambda i: 900 - 500 * (i / n))
-    e = [math.sin(math.pi * min(1.0, i / (n * 0.9))) ** 2.2 * (1 + 0.35 * math.sin(2 * math.pi * 11 * i / SR)) for i in range(n)]
-    thump = [0.5 * math.sin(2 * math.pi * (70 - 25 * i / n) * i / SR) for i in range(n)]
-    return [(wet[i] * 1.3 + thump[i]) * e[i] for i in range(n)]
+    n = int(SR * 0.55)
+    body = wet_body(rnd, n,
+                    lambda i: 300 + 700 * (0.5 + 0.5 * math.sin(2 * math.pi * 4.5 * i / SR)) + 300 * math.sin(2 * math.pi * 0.9 * i / SR),
+                    lambda i: 55 + 45 * math.sin(2 * math.pi * 2.2 * i / SR), 1.0)
+    e = [math.sin(math.pi * min(1.0, i / (n * 0.95))) ** 1.4 for i in range(n)]
+    body = [body[i] * e[i] for i in range(n)]
+    clicks = sticky_clicks(rnd, n, lambda i: 90 + 60 * math.sin(2 * math.pi * 3 * i / SR), amp=0.5, shape=lambda i: e[i])
+    th = [v * e[i] for i, v in enumerate(thump(n, 75, 55, 0.45))]
+    bubs = [0.0] * n
+    for _ in range(4):
+        b = bubble(rnd, rnd.uniform(500, 1100), 0.05, 0.35)
+        t = rnd.randint(int(n * 0.15), int(n * 0.85))
+        for i, v in enumerate(b):
+            if t + i < n:
+                bubs[t + i] += v
+    return fade_edges(mix(body, clicks, th, bubs))
+
 
 def stretch(seed):
+    """Fast pull: rising wet tear with crackle that gets finer as it thins."""
     rnd = random.Random(seed)
-    n = int(SR * 0.42)
-    noise = [rnd.uniform(-1, 1) for _ in range(n)]
-    wet = lowpass(noise, lambda i: 500 + 2600 * (i / n) ** 1.5)
-    e = [math.sin(math.pi * i / n) ** 1.2 for i in range(n)]
-    # rising wet tone underneath
-    tone = [0.35 * math.sin(2 * math.pi * (220 + 380 * (i / n) ** 2) * i / SR) for i in range(n)]
-    return [(wet[i] + tone[i]) * e[i] for i in range(n)]
+    n = int(SR * 0.5)
+    body = wet_body(rnd, n, lambda i: 500 + 2400 * (i / n) ** 1.6,
+                    lambda i: 70 - 50 * i / n, 0.9)
+    e = [math.sin(math.pi * i / n) ** 1.1 for i in range(n)]
+    body = [body[i] * e[i] for i in range(n)]
+    clicks = sticky_clicks(rnd, n, lambda i: 60 + 420 * (i / n) ** 2, f_lo=2800, f_hi=7000, amp=0.75, shape=lambda i: e[i])
+    rel = release_tail(rnd, 4200, 900, 0.09, 0.7)
+    out = mix(body, clicks)
+    for i, v in enumerate(rel):
+        j = int(n * 0.82) + i
+        if j < n:
+            out[j] += v
+    return fade_edges(out)
 
-def sprinkle(seed):
-    rnd = random.Random(seed)
-    n = int(SR * 0.45)
-    out = [0.0] * n
-    t = 0
-    while t < n - 400:
-        f = rnd.uniform(1800, 3600)
-        for k in range(400):
-            out[t + k] += math.sin(2 * math.pi * f * k / SR) * (1 - k / 400) ** 3 * 0.8
-        t += rnd.randint(500, 1600)
-    return out
-
-def bubble(seed):
-    rnd = random.Random(seed)
-    n = int(SR * 0.07)
-    f0 = rnd.uniform(900, 1700)
-    e = env(n, SR * 0.001, 2.5)
-    return [math.sin(2 * math.pi * (f0 + 600 * (i / n)) * i / SR) * e[i] for i in range(n)]
 
 def crackle(seed):
+    """Crunchy slime: dense foam-bead crackle, bright and dry."""
     rnd = random.Random(seed)
-    n = int(SR * 0.3)
-    out = [0.0] * n
-    t = 0
-    while t < n - 300:
-        amp = rnd.uniform(0.4, 1.0)
-        for k in range(260):
-            out[t + k] += rnd.uniform(-1, 1) * amp * (1 - k / 260) ** 4
-        t += rnd.randint(300, 1400)
-    return lowpass(out, lambda i: 5000)
+    n = int(SR * 0.34)
+    cl = sticky_clicks(rnd, n, lambda i: 520 * (1 - 0.7 * i / n), f_lo=1800, f_hi=7500, amp=1.0,
+                       shape=lambda i: (1 - i / n) ** 0.7)
+    body = wet_body(rnd, n, lambda i: 900 - 300 * i / n, lambda i: 30, 0.25)
+    body = [body[i] * (1 - i / n) ** 2 for i in range(n)]
+    return fade_edges(mix(cl, body))
+
 
 def poof(seed):
+    """Fluffy slime: soft airy puff, almost no clicks."""
     rnd = random.Random(seed)
-    n = int(SR * 0.3)
+    n = int(SR * 0.32)
     noise = [rnd.uniform(-1, 1) for _ in range(n)]
-    wet = lowpass(noise, lambda i: 400 + 900 * (1 - i / n))
+    air = lowpass(noise, lambda i: 350 + 1100 * (1 - i / n))
     e = [math.sin(math.pi * min(1.0, i / (n * 0.95))) ** 0.8 for i in range(n)]
-    return [wet[i] * e[i] for i in range(n)]
+    air = [air[i] * e[i] for i in range(n)]
+    clicks = sticky_clicks(rnd, n, 25, f_lo=1500, f_hi=3000, amp=0.15, shape=lambda i: e[i])
+    return fade_edges(mix(air, clicks))
+
+
+def slurp(seed):
+    """Colour drop lands / new lump: wet plop with a bubbly settle."""
+    rnd = random.Random(seed)
+    n = int(SR * 0.42)
+    th = [v * env(n, SR * 0.003, 2.5)[i] for i, v in enumerate(thump(n, 140, 50, 0.9))]
+    body = wet_body(rnd, n, lambda i: 400 + 1800 * (1 - i / n) ** 2, lambda i: 45 + 25 * i / n, 0.8)
+    body = [body[i] * env(n, SR * 0.004, 2.2)[i] for i in range(n)]
+    bubs = [0.0] * n
+    for k in range(6):
+        b = bubble(rnd, rnd.uniform(400, 1400), rnd.uniform(0.03, 0.07), 0.5)
+        t = int(n * (0.12 + 0.12 * k)) + rnd.randint(0, int(SR * 0.02))
+        for i, v in enumerate(b):
+            if t + i < n:
+                bubs[t + i] += v
+    clicks = sticky_clicks(rnd, n, lambda i: 120 * (1 - i / n), amp=0.4)
+    return fade_edges(mix(th, body, bubs, clicks))
+
+
+def bubble_pop(seed):
+    rnd = random.Random(seed)
+    b = bubble(rnd, rnd.uniform(700, 1500), 0.07, 1.0)
+    rel = release_tail(rnd, 3000, 1200, 0.04, 0.5, 0.02)
+    return fade_edges(mix(b, rel))
+
+
+def sprinkle(seed):
+    """Beads/stars landing: a scatter of tiny tinkly taps into soft slime."""
+    rnd = random.Random(seed)
+    n = int(SR * 0.5)
+    out = [0.0] * n
+    t = 0
+    while t < n - 600:
+        f = rnd.uniform(1600, 4200)
+        ln = rnd.randint(300, 700)
+        for k in range(ln):
+            out[t + k] += math.sin(2 * math.pi * f * k / SR) * (1 - k / ln) ** 3 * 0.8
+        # each bead also makes a tiny wet contact
+        for k in range(120):
+            out[t + k] += rnd.uniform(-1, 1) * (1 - k / 120) ** 3 * 0.25
+        t += rnd.randint(500, 1500)
+    return fade_edges(out)
+
 
 def click(seed):
     n = int(SR * 0.08)
@@ -118,75 +342,96 @@ def click(seed):
     for i in range(n):
         e = (1 - i / n) ** 6
         out.append((math.sin(2 * math.pi * 2400 * i / SR) + 0.5 * math.sin(2 * math.pi * 900 * i / SR)) * e)
-    return out
+    return fade_edges(out)
 
-def wet_loop(seed):
-    """Seamless 1.0s wet/gooey loop; the game pitches and fades it with drag speed."""
-    rnd = random.Random(seed)
-    n = SR
-    noise = [rnd.uniform(-1, 1) for _ in range(n)]
-    # slowly wandering cutoff for a bubbling character
-    cut = [600 + 500 * math.sin(2 * math.pi * 1.7 * i / SR) + 300 * math.sin(2 * math.pi * 4.3 * i / SR + 1) for i in range(n)]
-    wet = lowpass(noise, lambda i: cut[i])
-    # random tiny pops riding on top
-    t = 0
-    while t < n - 200:
-        amp = rnd.uniform(0.2, 0.6)
-        for k in range(160):
-            wet[t + k] += math.sin(2 * math.pi * rnd.uniform(500, 1200) * k / SR) * amp * (1 - k / 160) ** 3
-        t += rnd.randint(1500, 5000)
-    # crossfade tail into head so it loops
-    f = int(SR * 0.08)
-    for i in range(f):
-        a = i / f
-        wet[i] = wet[i] * a + wet[n - f + i] * (1 - a)
-    return wet[: n - f]
 
 def slice_wet(seed):
+    """Knife through soft slime: a wet zip that opens, then two surfaces part."""
     rnd = random.Random(seed)
-    n = int(SR * 0.28)
-    noise = [rnd.uniform(-1, 1) for _ in range(n)]
-    wet = lowpass(noise, lambda i: 2500 - 1800 * (i / n))
+    n = int(SR * 0.32)
+    body = wet_body(rnd, n, lambda i: 1800 - 1200 * i / n, lambda i: 25 + 20 * i / n, 0.9)
     e = [(math.sin(math.pi * min(1.0, i / (n * 0.5))) ** 0.6) * (1 - i / n) ** 0.8 for i in range(n)]
-    return [wet[i] * e[i] for i in range(n)]
+    body = [body[i] * e[i] for i in range(n)]
+    clicks = sticky_clicks(rnd, n, lambda i: 320 * (1 - i / n) + 40, f_lo=2500, f_hi=6500, amp=0.7, shape=lambda i: e[i])
+    rel = release_tail(rnd, 2200, 600, 0.08, 0.5)
+    out = mix(body, clicks)
+    for i, v in enumerate(rel):
+        j = int(n * 0.55) + i
+        if j < n:
+            out[j] += v
+    return fade_edges(out)
+
 
 def slice_crunch(seed):
     rnd = random.Random(seed)
-    n = int(SR * 0.26)
-    out = [0.0] * n
-    t = 0
-    while t < n - 200:
-        amp = rnd.uniform(0.5, 1.0) * (1 - t / n)
-        for k in range(180):
-            out[t + k] += rnd.uniform(-1, 1) * amp * (1 - k / 180) ** 3
-        t += rnd.randint(120, 500)
-    return lowpass(out, lambda i: 6000)
+    n = int(SR * 0.3)
+    cl = sticky_clicks(rnd, n, lambda i: 700 * (1 - 0.6 * i / n), f_lo=1500, f_hi=7000, amp=1.0,
+                       shape=lambda i: (1 - i / n) ** 0.5)
+    return fade_edges(cl)
+
 
 def jar_open(seed):
-    n = int(SR * 0.18)
+    n = int(SR * 0.2)
     out = []
     for i in range(n):
         e = (1 - i / n) ** 3
         f = 900 + 1400 * (i / n)
         out.append((math.sin(2 * math.pi * f * i / SR) * 0.7 + math.sin(2 * math.pi * 320 * i / SR) * 0.4) * e)
-    return out
+    rel = release_tail(random.Random(seed), 2500, 900, 0.05, 0.4, 0.015)
+    return fade_edges(mix(out, rel))
+
+
+def wet_loop(seed):
+    """Seamless ~1 s stereo kneading bed: wandering wet body + sticky clicks, L/R decorrelated."""
+    rnd = random.Random(seed)
+    n = SR
+    chans = []
+    for ch in range(2):
+        r2 = random.Random(seed * 7 + ch)
+        body = wet_body(r2, n,
+                        lambda i: 320 + 520 * (0.5 + 0.5 * math.sin(2 * math.pi * 1.7 * i / SR + ch)) + 260 * math.sin(2 * math.pi * 4.3 * i / SR + 1 + ch),
+                        lambda i: 55 + 35 * math.sin(2 * math.pi * 0.8 * i / SR + ch * 2), 1.0)
+        clicks = sticky_clicks(r2, n, lambda i: 70 + 40 * math.sin(2 * math.pi * 2.5 * i / SR + ch), amp=0.45)
+        bubs = [0.0] * n
+        for _ in range(5):
+            b = bubble(r2, r2.uniform(500, 1300), 0.045, 0.25)
+            t = r2.randint(0, n - len(b) - 1)
+            for i, v in enumerate(b):
+                bubs[t + i] += v
+        x = mix(body, clicks, bubs)
+        # crossfade tail into head so it loops
+        f = int(SR * 0.08)
+        for i in range(f):
+            a = i / f
+            x[i] = x[i] * a + x[n - f + i] * (1 - a)
+        chans.append(x[: n - f])
+    return chans
+
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "game/assets/sfx"
     os.makedirs(out, exist_ok=True)
-    for k in range(3):
+    for k in range(5):
         write(os.path.join(out, f"squish{k}.wav"), squish(10 + k))
-    write(os.path.join(out, "pop.wav"), pop(1))
-    write(os.path.join(out, "slurp.wav"), slurp(2))
-    write(os.path.join(out, "squelch.wav"), squelch(3))
-    write(os.path.join(out, "stretch.wav"), stretch(4))
-    write(os.path.join(out, "sprinkle.wav"), sprinkle(5))
+    for k in range(4):
+        write(os.path.join(out, f"pop{k}.wav"), pop(20 + k))
     for k in range(3):
-        write(os.path.join(out, f"bubble{k}.wav"), bubble(20 + k))
-    write(os.path.join(out, "crackle.wav"), crackle(30))
-    write(os.path.join(out, "poof.wav"), poof(31))
-    write(os.path.join(out, "click.wav"), click(32))
-    write(os.path.join(out, "wet_loop.wav"), wet_loop(40))
-    write(os.path.join(out, "slice_wet.wav"), slice_wet(41))
-    write(os.path.join(out, "slice_crunch.wav"), slice_crunch(42))
-    write(os.path.join(out, "jar.wav"), jar_open(43))
+        write(os.path.join(out, f"squelch{k}.wav"), squelch(30 + k))
+    for k in range(3):
+        write(os.path.join(out, f"stretch{k}.wav"), stretch(40 + k))
+    for k in range(3):
+        write(os.path.join(out, f"crackle{k}.wav"), crackle(50 + k))
+    for k in range(2):
+        write(os.path.join(out, f"poof{k}.wav"), poof(60 + k))
+    for k in range(2):
+        write(os.path.join(out, f"slurp{k}.wav"), slurp(70 + k))
+    for k in range(4):
+        write(os.path.join(out, f"bubble{k}.wav"), bubble_pop(80 + k))
+    write(os.path.join(out, "sprinkle.wav"), sprinkle(90))
+    write(os.path.join(out, "click.wav"), click(91))
+    for k in range(2):
+        write(os.path.join(out, f"slice_wet{k}.wav"), slice_wet(100 + k))
+    write(os.path.join(out, "slice_crunch.wav"), slice_crunch(102))
+    write(os.path.join(out, "jar.wav"), jar_open(103))
+    L, R = wet_loop(110)
+    write(os.path.join(out, "wet_loop.wav"), None, stereo=(L, R))

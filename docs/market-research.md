@@ -82,6 +82,20 @@ we already made those choices.
 9. **Keep it offline and tiny.** Offline is one of the three parent must-haves; we're already
    there. Watch APK size (currently ~52 MB; fine).
 
+## 4b. Sound research (2026-10-18, applied in art/make_sfx.py)
+- Tingling in ASMR listeners is best predicted by the amplitude envelope around 5 kHz in
+  the ~1.5 s before the response; pleasantness needs longer, denser, cyclic patterns; sounds
+  that feel *close* (low inter-aural correlation) work best. → every wet sound now carries
+  clusters of 3–15 ms resonant "sticky clicks" at 2–6 kHz; the kneading bed is stereo with
+  decorrelated channels; the bus is nearly dry with a tiny room and light compression.
+- Foley practice: a squeeze builds pressure gradually then ends in a brief tearing release;
+  pulling out is a long wet suction; squelches at uneven spacing read as organic. → squish
+  has an 18 ms pressure ramp and a late release; pop is a falling-resonance release with a
+  faint delayed tail; click timing is jittered.
+- "Squish engine" recipe: noise through a modulated band-pass + comb filter. → `wet_body()`.
+- CC0 recordings exist if synthesis is not enough: OpenGameArt "Squish Sounds Effects" by
+  EZduzziteh (8 MP3s, CC0) and rubberduck's mud/slime pack (CC0). Not pulled in yet.
+
 ## 5. Honest expectations
 
 Free with no ads means no revenue by design, and the category's leaders buy installs. What
@@ -89,6 +103,14 @@ a clean app can win is: the Teacher Approved badge, high ratings (no ad complain
 "no ads" search traffic, and parent word-of-mouth. That is enough for a few thousand happy
 families and a 4.7-star page; it is not a path to the top charts without spending. For
 *your* kids it is already the best slime app on the tablet.
+
+## Sources (sound)
+- Sound texture statistics vs tingling: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11444235/
+- Artificial ASMR (cyclic patterns): https://arxiv.org/html/2210.14321v3
+- Squish Engine (comb/flanger recipe): https://klangmag.co/surrealism-through-sound-design-the-squish-engine-manifesto/
+- Foley envelope notes: https://morphic.com/resources/sounds/squish-sound-effect
+- Procedural audio review (soft bodies): https://www.eecs.qmul.ac.uk/~josh/documents/2023/Procedural%20audio%20review.pdf
+- CC0 packs: https://opengameart.org/content/squish-sounds-effects , https://opengameart.org/node/183322
 
 ## Sources
 - Goo (Google Play reviews): https://play.google.com/store/apps/details?id=gg.goo

@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://b20ym1fma32dg"
-path="res://.godot/imported/crackle.wav-3029866ae89ce778ee2b4843f215990e.sample"
+uid="uid://bb7gefq05r0cw"
+path="res://.godot/imported/squelch0.wav-c2049738ef3842dde8622c8a0a6bf45f.sample"
 
 [deps]
 
-source_file="res://assets/sfx/crackle.wav"
-dest_files=["res://.godot/imported/crackle.wav-3029866ae89ce778ee2b4843f215990e.sample"]
+source_file="res://assets/sfx/squelch0.wav"
+dest_files=["res://.godot/imported/squelch0.wav-c2049738ef3842dde8622c8a0a6bf45f.sample"]
 
 [params]
 

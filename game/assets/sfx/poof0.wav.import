@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://bqngsseu0d8sq"
-path="res://.godot/imported/squelch.wav-e94a01d862ca1639db0a898f4a30192f.sample"
+uid="uid://cbkpb4pjdwirs"
+path="res://.godot/imported/poof0.wav-5f3892f8b6e3a54dc68f45e59422f33a.sample"
 
 [deps]
 
-source_file="res://assets/sfx/squelch.wav"
-dest_files=["res://.godot/imported/squelch.wav-e94a01d862ca1639db0a898f4a30192f.sample"]
+source_file="res://assets/sfx/poof0.wav"
+dest_files=["res://.godot/imported/poof0.wav-5f3892f8b6e3a54dc68f45e59422f33a.sample"]
 
 [params]
 

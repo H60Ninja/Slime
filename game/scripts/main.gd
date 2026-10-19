@@ -25,17 +25,17 @@ var ui: CanvasLayer
 var mixing: Node2D = null
 var _play_area := Rect2()
 var _squish: Array[AudioStreamPlayer] = []
-var _pop: AudioStreamPlayer
-var _slurp: AudioStreamPlayer
-var _squelch: AudioStreamPlayer
-var _stretch: AudioStreamPlayer
+var _pops: Array[AudioStreamPlayer] = []
+var _slurps: Array[AudioStreamPlayer] = []
+var _squelches: Array[AudioStreamPlayer] = []
+var _stretches: Array[AudioStreamPlayer] = []
 var _sprinkle: AudioStreamPlayer
-var _crackle: AudioStreamPlayer
-var _poof: AudioStreamPlayer
+var _crackles: Array[AudioStreamPlayer] = []
+var _poofs: Array[AudioStreamPlayer] = []
 var _click: AudioStreamPlayer
 var _bubble: Array[AudioStreamPlayer] = []
 var _wet: AudioStreamPlayer
-var _slice_wet: AudioStreamPlayer
+var _slice_wets: Array[AudioStreamPlayer] = []
 var _slice_crunch: AudioStreamPlayer
 var _jar: AudioStreamPlayer
 var jars: CanvasLayer
@@ -67,13 +67,13 @@ func _ready() -> void:
 
 	ui.color_picked.connect(_on_color)
 	ui.style_picked.connect(func(s: String): slime.style = s; slime.wobble(0.6); _play(_touch_sound()); _save())
-	ui.sparkle_toggled.connect(func(on: bool): slime.sparkle = on; _play(_pop); _save())
+	ui.sparkle_toggled.connect(func(on: bool): slime.sparkle = on; _play(_pops.pick_random()); _save())
 	ui.reset_pressed.connect(_on_new)
 	ui.bowl_pressed.connect(func(): if not mixing: _start_mixing())
 	ui.themes_pressed.connect(func(): if not mixing: themes.open(); _play(_click))
 	ui.scents_pressed.connect(func(): if not mixing: scents_picker.open(scents.scent); _play(_click))
 	ui.addin_pressed.connect(func(kind: int): slime.addins.sprinkle(kind, 10); _play(_sprinkle))
-	ui.stamp_pressed.connect(func(shape: String): slime.stamp(shape); _play(_squelch))
+	ui.stamp_pressed.connect(func(shape: String): slime.stamp(shape); _play(_squelches.pick_random()))
 	ui.snapshot_pressed.connect(_snapshot)
 	ui.knife_toggled.connect(_on_knife)
 	ui.jars_pressed.connect(func(): if not mixing: jars.open(); _play(_jar))
@@ -81,26 +81,34 @@ func _ready() -> void:
 	slime.style_changed.connect(_on_style_changed)
 	slime.touch_at.connect(func(px: Vector2): scents.puff(px, 3); _hide_hint())
 	slime.knead_at.connect(func(px: Vector2): scents.puff(px, 1))
-	slime.sliced.connect(func(): _play(_slice_crunch if slime.style == "crunchy" else _slice_wet))
+	slime.sliced.connect(func(): _play(_slice_crunch if slime.style == "crunchy" else _slice_wets.pick_random()))
 	slime.touched.connect(func(inside: bool): if inside: _play(_touch_sound()))
-	slime.released.connect(func(inside: bool): if inside: _play(_pop); slime.wobble(0.3))
-	slime.stretched.connect(func(): _play(_crackle if slime.style == "crunchy" else _stretch))
-	slime.held.connect(func(): _play(_poof if slime.style == "fluffy" else _squelch))
+	slime.released.connect(func(inside: bool): if inside: _play(_pops.pick_random()); slime.wobble(0.3))
+	slime.stretched.connect(func(): _play(_crackles.pick_random() if slime.style == "crunchy" else _stretches.pick_random()))
+	slime.held.connect(func(): _play(_poofs.pick_random() if slime.style == "fluffy" else _squelches.pick_random()))
 	slime.bubbles.popped.connect(func(): _play(_bubble.pick_random()))
 
+	_setup_audio_bus()
+	for k in 5:
+		_squish.append(_player("res://assets/sfx/squish%d.wav" % k, -1.0))
+	for k in 4:
+		_pops.append(_player("res://assets/sfx/pop%d.wav" % k, -5.0))
+	for k in 2:
+		_slurps.append(_player("res://assets/sfx/slurp%d.wav" % k))
 	for k in 3:
-		_squish.append(_player("res://assets/sfx/squish%d.wav" % k))
-	_pop = _player("res://assets/sfx/pop.wav", -6.0)
-	_slurp = _player("res://assets/sfx/slurp.wav")
-	_squelch = _player("res://assets/sfx/squelch.wav", -3.0)
-	_stretch = _player("res://assets/sfx/stretch.wav", -4.0)
-	_sprinkle = _player("res://assets/sfx/sprinkle.wav", -2.0)
-	_crackle = _player("res://assets/sfx/crackle.wav", -3.0)
-	_poof = _player("res://assets/sfx/poof.wav", -3.0)
-	_click = _player("res://assets/sfx/click.wav", -4.0)
+		_squelches.append(_player("res://assets/sfx/squelch%d.wav" % k, -2.0))
 	for k in 3:
-		_bubble.append(_player("res://assets/sfx/bubble%d.wav" % k, -8.0))
-	_slice_wet = _player("res://assets/sfx/slice_wet.wav", -2.0)
+		_stretches.append(_player("res://assets/sfx/stretch%d.wav" % k, -3.0))
+	for k in 3:
+		_crackles.append(_player("res://assets/sfx/crackle%d.wav" % k, -3.0))
+	for k in 2:
+		_poofs.append(_player("res://assets/sfx/poof%d.wav" % k, -2.0))
+	_sprinkle = _player("res://assets/sfx/sprinkle.wav", -3.0)
+	_click = _player("res://assets/sfx/click.wav", -6.0)
+	for k in 4:
+		_bubble.append(_player("res://assets/sfx/bubble%d.wav" % k, -7.0))
+	for k in 2:
+		_slice_wets.append(_player("res://assets/sfx/slice_wet%d.wav" % k, -2.0))
 	_slice_crunch = _player("res://assets/sfx/slice_crunch.wav", -2.0)
 	_jar = _player("res://assets/sfx/jar.wav", -6.0)
 	_wet = _player("res://assets/sfx/wet_loop.wav", -60.0)
@@ -108,7 +116,7 @@ func _ready() -> void:
 	if ws:
 		ws.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		ws.loop_begin = 0
-		ws.loop_end = ws.data.size() / 2
+		ws.loop_end = ws.data.size() / (4 if ws.stereo else 2)
 	_wet.play()
 
 	jars = JarsScript.new()
@@ -116,7 +124,7 @@ func _ready() -> void:
 	add_child(jars)
 	jars.setup(func(): return slime.get_state(), _thumb_image)
 	jars.jar_saved.connect(func(_i: int): _play(_jar))
-	jars.jar_loaded.connect(func(_i: int, st: Dictionary): slime.set_state(st); ui.set_state(slime.color, slime.style, slime.sparkle); _play(_slurp); _save())
+	jars.jar_loaded.connect(func(_i: int, st: Dictionary): slime.set_state(st); ui.set_state(slime.color, slime.style, slime.sparkle); _play(_slurps.pick_random()); _save())
 
 	scents = ScentsScript.new()
 	scents.name = "Scents"
@@ -160,9 +168,9 @@ func _ready() -> void:
 func _touch_sound() -> AudioStreamPlayer:
 	match slime.style:
 		"crunchy":
-			return _crackle
+			return _crackles.pick_random()
 		"fluffy":
-			return _poof
+			return _poofs.pick_random()
 	return _squish.pick_random()
 
 
@@ -214,16 +222,42 @@ func _layout() -> void:
 		mixing.set_area(_play_area)
 
 
+## A "Slime" bus: light compression keeps the sticky clicks present, a very short, mostly
+## dry room gives the close-mic feel ASMR recordings have.
+func _setup_audio_bus() -> void:
+	if AudioServer.get_bus_index("Slime") != -1:
+		return
+	var idx := AudioServer.bus_count
+	AudioServer.add_bus(idx)
+	AudioServer.set_bus_name(idx, "Slime")
+	AudioServer.set_bus_send(idx, "Master")
+	var comp := AudioEffectCompressor.new()
+	comp.threshold = -14.0
+	comp.ratio = 3.0
+	comp.attack_us = 8.0
+	comp.release_ms = 90.0
+	comp.gain = 2.0
+	AudioServer.add_bus_effect(idx, comp)
+	var rev := AudioEffectReverb.new()
+	rev.room_size = 0.12
+	rev.damping = 0.7
+	rev.wet = 0.08
+	rev.dry = 1.0
+	rev.predelay_msec = 6.0
+	AudioServer.add_bus_effect(idx, rev)
+
+
 func _player(path: String, db := 0.0) -> AudioStreamPlayer:
 	var p := AudioStreamPlayer.new()
 	p.stream = load(path)
 	p.volume_db = db
+	p.bus = "Slime"
 	add_child(p)
 	return p
 
 
 func _play(p: AudioStreamPlayer) -> void:
-	p.pitch_scale = randf_range(0.85, 1.2)
+	p.pitch_scale = randf_range(0.9, 1.12)
 	p.play()
 
 
@@ -235,10 +269,10 @@ func _start_mixing() -> void:
 	mixing = MixingScript.new()
 	mixing.name = "Mixing"
 	mixing.set_area(_play_area)
-	mixing.poured.connect(func(): _play(_slurp))
+	mixing.poured.connect(func(): _play(_slurps.pick_random()))
 	mixing.stirring.connect(func(): _play(_squish.pick_random()))
 	mixing.color_chosen.connect(_on_mix_color)
-	mixing.skipped.connect(func(): if mixing: mixing.queue_free(); _on_mixed(slime.color); _play(_pop))
+	mixing.skipped.connect(func(): if mixing: mixing.queue_free(); _on_mixed(slime.color); _play(_pops.pick_random()))
 	mixing.done.connect(_on_mixed)
 	add_child(mixing)
 	ui.set_ritual_mode(true)
@@ -258,9 +292,9 @@ func _on_mix_color(col: Color, from: Vector2) -> void:
 	pour.start = from
 	pour.target = mixing.bowl_center
 	pour.position = from
-	pour.landed.connect(func(c: Color, _at: Vector2): if mixing: mixing.add_color(c); slime.color = c; _play(_slurp))
+	pour.landed.connect(func(c: Color, _at: Vector2): if mixing: mixing.add_color(c); slime.color = c; _play(_slurps.pick_random()))
 	add_child(pour)
-	_play(_pop)
+	_play(_pops.pick_random())
 
 
 func _on_mixed(col: Color) -> void:
@@ -271,7 +305,7 @@ func _on_mixed(col: Color) -> void:
 	slime.visible = true
 	slime.set_process_unhandled_input(not _knife)
 	slime.set_physics_process(true)
-	_play(_slurp)
+	_play(_slurps.pick_random())
 	_save()
 	_show_hint()
 
@@ -294,7 +328,7 @@ func _on_new() -> void:
 		return
 	slime.reset()
 	scents.puff(slime.drop_target(), 4)
-	_play(_slurp)
+	_play(_slurps.pick_random())
 
 
 func _on_color(c: Color, from: Vector2) -> void:
@@ -303,9 +337,9 @@ func _on_color(c: Color, from: Vector2) -> void:
 	pour.start = from
 	pour.target = slime.drop_target()
 	pour.position = from
-	pour.landed.connect(func(col: Color, _at: Vector2): slime.drop(col); scents.puff(slime.drop_target(), 3); _play(_slurp); _save())
+	pour.landed.connect(func(col: Color, _at: Vector2): slime.drop(col); scents.puff(slime.drop_target(), 3); _play(_slurps.pick_random()); _save())
 	add_child(pour)
-	_play(_pop)
+	_play(_pops.pick_random())
 
 
 func _apply_theme(id: String) -> void:
@@ -327,7 +361,7 @@ func _apply_theme(id: String) -> void:
 	ui.set_scent(scents.scent)
 	ui.set_state(slime.color, slime.style, slime.sparkle)
 	scents.puff(slime.drop_target(), 5)
-	_play(_slurp)
+	_play(_slurps.pick_random())
 	_save()
 
 
