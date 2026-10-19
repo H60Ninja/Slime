@@ -36,3 +36,8 @@ make emu-fire     # boot the Fire HD 10 class emulator
 make run-fire     # export the APK, install and launch it
 make run-device   # same, to a USB tablet with ADB enabled
 ```
+
+## Credits
+
+Sound bodies are built on CC0 recordings by EZduzziteh and rubberduck from OpenGameArt
+(see `art/cc0/LICENSE.md`); everything else is generated in `art/`.

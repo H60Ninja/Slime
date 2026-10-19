@@ -93,8 +93,10 @@ we already made those choices.
   has an 18 ms pressure ramp and a late release; pop is a falling-resonance release with a
   faint delayed tail; click timing is jittered.
 - "Squish engine" recipe: noise through a modulated band-pass + comb filter. → `wet_body()`.
-- CC0 recordings exist if synthesis is not enough: OpenGameArt "Squish Sounds Effects" by
-  EZduzziteh (8 MP3s, CC0) and rubberduck's mud/slime pack (CC0). Not pulled in yet.
+- CC0 recordings now form the body of squish/pop/squelch/stretch/slurp/slice and the
+  kneading bed: EZduzziteh "Squish Sounds Effects", rubberduck "25 CC0 mud sfx" and
+  "40 CC0 water/splash/slime SFX" (16 slime sounds partly recorded from real slime).
+  Licenses verified on each OpenGameArt page 2026-10-18; see art/cc0/LICENSE.md.
 
 ## 5. Honest expectations
 

@@ -14,9 +14,61 @@ Design notes (from the 2026-10-18 research pass, see docs/market-research.md):
 - Variation beats fidelity: each family has several variants and the game adds pitch
   randomisation on top, so nothing repeats exactly.
 """
-import math, os, random, struct, sys, wave
+import math, os, random, struct, subprocess, sys, wave
 
 SR = 44100
+CC0_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cc0")
+DECODED = os.path.join(CC0_DIR, ".decoded")
+_rec_cache = {}
+
+
+def rec(name, dur=None, gain=1.0, start_at_attack=True, fade_ms=18):
+    """A CC0 recording (see art/cc0/LICENSE.md) as a mono float list, decoded once with
+    ffmpeg. Trimmed to `dur` seconds from its attack and faded out. Missing ffmpeg or file
+    -> empty list, so the synthesized layers still build on their own."""
+    key = (name, dur, start_at_attack)
+    if key in _rec_cache:
+        return gain_list(_rec_cache[key], gain)
+    src = None
+    for ext in (".ogg", ".mp3", ".flac", ".wav"):
+        cand = os.path.join(CC0_DIR, name + ext)
+        if os.path.exists(cand):
+            src = cand
+            break
+    if src is None:
+        print("  (no recording", name, ")")
+        return []
+    os.makedirs(DECODED, exist_ok=True)
+    wav = os.path.join(DECODED, name + ".wav")
+    if not os.path.exists(wav):
+        try:
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src, "-ac", "1", "-ar", str(SR), "-sample_fmt", "s16", wav], check=True)
+        except Exception as e:
+            print("  (ffmpeg failed for", name, e, ")")
+            return []
+    w = wave.open(wav); n = w.getnframes(); data = w.readframes(n); w.close()
+    xs = [v / 32767 for v in struct.unpack("<%dh" % n, data)]
+    peak = max(1e-6, max(abs(v) for v in xs))
+    xs = [v / peak * 0.9 for v in xs]
+    if start_at_attack:
+        th = 0.12
+        i0 = next((i for i, v in enumerate(xs) if abs(v) > th), 0)
+        i0 = max(0, i0 - int(SR * 0.004))
+        xs = xs[i0:]
+    if dur is not None:
+        xs = xs[: int(SR * dur)]
+    f = int(SR * fade_ms / 1000)
+    n = len(xs)
+    for i in range(min(f, n)):
+        xs[n - 1 - i] *= i / f
+    for i in range(min(int(SR * 0.002), n)):
+        xs[i] *= i / (SR * 0.002)
+    _rec_cache[key] = xs
+    return gain_list(xs, gain)
+
+
+def gain_list(xs, g):
+    return [x * g for x in xs]
 
 
 # ---------------------------------------------------------------- DSP helpers
@@ -199,10 +251,19 @@ def bubble(rnd, f0, dur, amp=1.0):
 
 # ---------------------------------------------------------------- sounds
 
+SQUISH_RECS = ["slime_04", "slime_16", "slime_15", "squish_04", "slime_02"]
+POP_RECS = ["squishsplat_impact", "squish_03", "squish_01", "mud_24"]
+SQUELCH_RECS = ["mud_08", "mud_13", "mud_12"]
+STRETCH_RECS = ["slime_14", "slime_07", "slime_01"]
+SLURP_RECS = ["splash_10", "splash_06"]
+
+
 def squish(seed):
-    """Finger lands on slime: soft thump, wet body that builds then tears, clicks."""
+    """Finger lands on slime: real slime recording as the body, synthesized thump,
+    sticky clicks and a late tearing release on top."""
     rnd = random.Random(seed)
     n = int(SR * 0.30)
+    r = rec(SQUISH_RECS[seed % len(SQUISH_RECS)], 0.30, 0.9)
     body = wet_body(rnd, n,
                     lambda i: 380 + 900 * (0.5 + 0.5 * math.sin(2 * math.pi * 7 * i / SR)) * (1 - i / n),
                     lambda i: 60 + 50 * math.sin(2 * math.pi * 3.1 * i / SR + seed), 1.0)
@@ -212,7 +273,7 @@ def squish(seed):
                            shape=lambda i: min(1.0, i / (SR * 0.01)))
     th = [v * env(n, SR * 0.002, 3.5)[i] for i, v in enumerate(thump(n, 110, 60, 0.7))]
     rel = release_tail(rnd, 2600, 700, 0.07, 0.45)
-    out = mix(body, clicks, th)
+    out = mix(gain_list(body, 0.35 if r else 1.0), clicks, th, r)
     for i, v in enumerate(rel):
         j = int(SR * 0.16) + i
         if j < n:
@@ -228,13 +289,15 @@ def pop(seed):
     suck = wet_body(rnd, n, lambda i: 900 - 500 * i / n, lambda i: 40 + 30 * i / n, 0.4)
     suck = [suck[i] * env(n, SR * 0.001, 2.5)[i] for i in range(n)]
     clicks = sticky_clicks(rnd, n, lambda i: 260 * (1 - i / n), amp=0.6)
-    return fade_edges(mix(rel, suck, clicks))
+    r = rec(POP_RECS[seed % len(POP_RECS)], 0.14, 0.8)
+    return fade_edges(mix(rel, gain_list(suck, 0.5 if r else 1.0), clicks, r))
 
 
 def squelch(seed):
     """Finger held down and wiggled: long gooey kneading squelch."""
     rnd = random.Random(seed)
     n = int(SR * 0.55)
+    r = rec(SQUELCH_RECS[seed % len(SQUELCH_RECS)], 0.55, 0.9)
     body = wet_body(rnd, n,
                     lambda i: 300 + 700 * (0.5 + 0.5 * math.sin(2 * math.pi * 4.5 * i / SR)) + 300 * math.sin(2 * math.pi * 0.9 * i / SR),
                     lambda i: 55 + 45 * math.sin(2 * math.pi * 2.2 * i / SR), 1.0)
@@ -249,20 +312,21 @@ def squelch(seed):
         for i, v in enumerate(b):
             if t + i < n:
                 bubs[t + i] += v
-    return fade_edges(mix(body, clicks, th, bubs))
+    return fade_edges(mix(gain_list(body, 0.4 if r else 1.0), clicks, th, bubs, r))
 
 
 def stretch(seed):
     """Fast pull: rising wet tear with crackle that gets finer as it thins."""
     rnd = random.Random(seed)
     n = int(SR * 0.5)
+    r = rec(STRETCH_RECS[seed % len(STRETCH_RECS)], 0.5, 0.8)
     body = wet_body(rnd, n, lambda i: 500 + 2400 * (i / n) ** 1.6,
                     lambda i: 70 - 50 * i / n, 0.9)
     e = [math.sin(math.pi * i / n) ** 1.1 for i in range(n)]
     body = [body[i] * e[i] for i in range(n)]
     clicks = sticky_clicks(rnd, n, lambda i: 60 + 420 * (i / n) ** 2, f_lo=2800, f_hi=7000, amp=0.75, shape=lambda i: e[i])
     rel = release_tail(rnd, 4200, 900, 0.09, 0.7)
-    out = mix(body, clicks)
+    out = mix(gain_list(body, 0.45 if r else 1.0), clicks, r)
     for i, v in enumerate(rel):
         j = int(n * 0.82) + i
         if j < n:
@@ -308,7 +372,8 @@ def slurp(seed):
             if t + i < n:
                 bubs[t + i] += v
     clicks = sticky_clicks(rnd, n, lambda i: 120 * (1 - i / n), amp=0.4)
-    return fade_edges(mix(th, body, bubs, clicks))
+    r = rec(SLURP_RECS[seed % len(SLURP_RECS)], 0.42, 0.85)
+    return fade_edges(mix(th, gain_list(body, 0.4 if r else 1.0), bubs, clicks, r))
 
 
 def bubble_pop(seed):
@@ -354,7 +419,8 @@ def slice_wet(seed):
     body = [body[i] * e[i] for i in range(n)]
     clicks = sticky_clicks(rnd, n, lambda i: 320 * (1 - i / n) + 40, f_lo=2500, f_hi=6500, amp=0.7, shape=lambda i: e[i])
     rel = release_tail(rnd, 2200, 600, 0.08, 0.5)
-    out = mix(body, clicks)
+    r = rec(["slime_12", "slime_14"][seed % 2], 0.32, 0.7)
+    out = mix(gain_list(body, 0.5 if r else 1.0), clicks, r)
     for i, v in enumerate(rel):
         j = int(n * 0.55) + i
         if j < n:
@@ -398,7 +464,11 @@ def wet_loop(seed):
             t = r2.randint(0, n - len(b) - 1)
             for i, v in enumerate(b):
                 bubs[t + i] += v
-        x = mix(body, clicks, bubs)
+        bed = rec("loop_bubbles_1", None, 0.5, start_at_attack=False, fade_ms=0)
+        if bed:
+            off = int(SR * 0.6) * (ch + 1)
+            bed = [bed[(off + i) % len(bed)] for i in range(n)]
+        x = mix(body, clicks, bubs, bed)
         # crossfade tail into head so it loops
         f = int(SR * 0.08)
         for i in range(f):
