@@ -3,7 +3,7 @@
 Same text for both stores. Package `com.h60ninja.slime`, version 1.0.0 (versionCode 2).
 
 ## Title
-Slime: No Ads Sensory Play
+Squish! Slime for Kids   (chosen for Amazon 2026-10-18; "Slime: No Ads Sensory Play" was the runner-up)
 
 (Amazon title field is longer; use "Slime — Squish, Mold & Mix. No Ads, No Purchases".)
 
