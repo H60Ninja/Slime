@@ -12,6 +12,9 @@ signal reset_pressed
 signal snapshot_pressed
 signal knife_toggled(on: bool)
 signal jars_pressed
+signal bowl_pressed
+signal themes_pressed
+signal scents_pressed
 
 const PALETTE: Array[Color] = [
 	Color("6fe36a"),  # lime
@@ -28,7 +31,7 @@ const PALETTE: Array[Color] = [
 const STYLES := ["shiny", "clear", "metal", "cloud", "crunchy", "butter", "fluffy", "glow", "holo", "magic"]
 const DOT := 88.0
 
-enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART, CRUNCHY, BUTTER, FLUFFY, CAMERA, GLOW, HOLO, MAGIC, KNIFE, JARS }
+enum Icon { PLUS, STAR, SHINY, CLEAR, METAL, CLOUD, BEADS, STARS, STAMP_STAR, STAMP_HEART, CRUNCHY, BUTTER, FLUFFY, CAMERA, GLOW, HOLO, MAGIC, KNIFE, JARS, BOWL, THEMES, SCENTS }
 const STYLE_ICONS := [Icon.SHINY, Icon.CLEAR, Icon.METAL, Icon.CLOUD, Icon.CRUNCHY, Icon.BUTTER, Icon.FLUFFY, Icon.GLOW, Icon.HOLO, Icon.MAGIC]
 
 var _buttons: Array[Button] = []
@@ -39,6 +42,11 @@ var _sparkle := false
 var _spark_btn: Button
 var _knife_btn: Button
 var _knife := false
+var _palette: VBoxContainer
+var _styles_col: VBoxContainer
+var _tools: HFlowContainer
+var _scent_btn: Button
+var _scent_kind := ""
 var _pulse_target: Control = null
 var _pulse_t := 0.0
 var _pulse: PulseRing
@@ -47,6 +55,7 @@ var _pulse: PulseRing
 func _ready() -> void:
 	var col := VBoxContainer.new()
 	col.name = "Palette"
+	_palette = col
 	add_child(col)
 	col.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
 	col.offset_right = -24
@@ -61,6 +70,7 @@ func _ready() -> void:
 
 	var left := VBoxContainer.new()
 	left.name = "Styles"
+	_styles_col = left
 	add_child(left)
 	left.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
 	left.offset_left = 24
@@ -74,22 +84,33 @@ func _ready() -> void:
 		left.add_child(b)
 		_style_buttons.append(b)
 
-	var row := HBoxContainer.new()
+	var row := HFlowContainer.new()
 	row.name = "Tools"
+	_tools = row
 	add_child(row)
 	row.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	row.offset_left = 24 + DOT + 30
 	row.offset_right = -(24 + DOT + 30)
 	row.offset_bottom = -24
-	row.offset_top = -24 - DOT
-	row.add_theme_constant_override("separation", 12)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.offset_top = -24 - DOT * 2 - 14
+	row.add_theme_constant_override("h_separation", 12)
+	row.add_theme_constant_override("v_separation", 14)
+	row.alignment = FlowContainer.ALIGNMENT_CENTER
+	row.last_wrap_alignment = FlowContainer.LAST_WRAP_ALIGNMENT_CENTER
 
 	var fresh := _round_button(Color.WHITE)
 	fresh.name = "New"
 	fresh.add_child(_icon(Icon.PLUS))
 	fresh.pressed.connect(func(): reset_pressed.emit())
 	row.add_child(fresh)
+	var bowl := _round_button(Color.WHITE)
+	bowl.add_child(_icon(Icon.BOWL))
+	bowl.pressed.connect(func(): bowl_pressed.emit())
+	row.add_child(bowl)
+	var themes := _round_button(Color.WHITE)
+	themes.add_child(_icon(Icon.THEMES))
+	themes.pressed.connect(func(): themes_pressed.emit())
+	row.add_child(themes)
 
 	row.add_child(_spacer())
 	_spark_btn = _round_button(Color.WHITE)
@@ -131,11 +152,32 @@ func _ready() -> void:
 	jars.add_child(_icon(Icon.JARS))
 	jars.pressed.connect(func(): jars_pressed.emit())
 	row.add_child(jars)
+	_scent_btn = _round_button(Color.WHITE)
+	_scent_btn.add_child(_icon(Icon.SCENTS))
+	_scent_btn.pressed.connect(func(): scents_pressed.emit())
+	row.add_child(_scent_btn)
 
 	_pulse = PulseRing.new()
 	_pulse.visible = false
 	add_child(_pulse)
 
+	_refresh_selection()
+
+
+## One toolbar row in landscape, two in portrait.
+func set_portrait(portrait: bool) -> void:
+	_tools.offset_top = (-24 - DOT * 2 - 14) if portrait else (-24 - DOT)
+
+
+## During the make-slime opening, hide everything the kid doesn't need.
+func set_ritual_mode(on: bool) -> void:
+	_palette.visible = not on
+	_styles_col.visible = not on
+	_tools.visible = not on
+
+
+func set_scent(kind: String) -> void:
+	_scent_kind = kind
 	_refresh_selection()
 
 
@@ -170,6 +212,14 @@ func _round_button(fill: Color) -> Button:
 	for state in ["normal", "hover", "focus", "disabled"]:
 		b.add_theme_stylebox_override(state, _dot_style(fill, Color.WHITE, 0))
 	b.add_theme_stylebox_override("pressed", _dot_style(fill.darkened(0.15), Color.WHITE, 0))
+	b.pivot_offset = Vector2(DOT, DOT) * 0.5
+	b.button_down.connect(func():
+		var tw := b.create_tween()
+		tw.tween_property(b, "scale", Vector2(0.86, 0.86), 0.06))
+	b.button_up.connect(func():
+		var tw := b.create_tween()
+		tw.tween_property(b, "scale", Vector2(1.08, 1.08), 0.08)
+		tw.tween_property(b, "scale", Vector2.ONE, 0.12).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK))
 	return b
 
 
@@ -199,6 +249,7 @@ func _refresh_selection() -> void:
 		_set_ring(_style_buttons[i], Color.WHITE, i == _style, Color("4fb8ff"))
 	_set_ring(_spark_btn, Color.WHITE, _sparkle, Color("ffd84d"))
 	_set_ring(_knife_btn, Color.WHITE, _knife, Color("ff6b6b"))
+	_set_ring(_scent_btn, Color.WHITE, _scent_kind != "", Color("ff8fcf"))
 
 
 ## Sync with loaded settings (no signals).
@@ -246,6 +297,9 @@ func _icon(kind: Icon) -> Control:
 	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return c
+
+
+const ScentDraw := preload("res://scripts/scents.gd")
 
 
 class PulseRing extends Node2D:
@@ -360,6 +414,19 @@ class IconControl extends Control:
 				draw_rect(Rect2(c + Vector2(-14, -22), Vector2(28, 10)), Color("7a8699"))
 				draw_rect(Rect2(c + Vector2(-14, 2), Vector2(28, 18)), Color("ff8fcf"))
 				draw_circle(c + Vector2(-9, -2), 4, Color(1, 1, 1, 0.8))
+			19:  # BOWL: mixing bowl with spoon
+				draw_circle(c + Vector2(0, 6), 26, Color("e9e2d6"))
+				draw_circle(c + Vector2(0, 6), 20, Color("ff9ad5"))
+				draw_line(c + Vector2(-4, 2), c + Vector2(22, -26), Color("8a6a4a"), 7.0, true)
+			20:  # THEMES: three little scoops (ice cream)
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-16, 6), c + Vector2(16, 6), c + Vector2(0, 30)]), Color("e0a86a"))
+				draw_circle(c + Vector2(-10, -2), 12, Color("ff9ad5"))
+				draw_circle(c + Vector2(10, -2), 12, Color("9fd8ff"))
+				draw_circle(c + Vector2(0, -16), 12, Color("fff2bf"))
+			21:  # SCENTS: strawberry
+				draw_set_transform(c, 0.0, Vector2.ONE)
+				ScentDraw.draw_icon(self, "strawberry", 0.95)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 			13:  # CAMERA
 				var body := Rect2(c + Vector2(-26, -14), Vector2(52, 36))
 				draw_rect(body, Color("5a6478"))

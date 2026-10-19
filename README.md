@@ -10,11 +10,17 @@ slime: pour glue, pick a colour, pour activator, stir. No text, no ads, no inter
 **Controls (all icons):** right column = colours (tap to pour a drop, swirl to mix).
 Left column = slime kind: shiny · clear · metal · cloud · crunchy · butter · fluffy ·
 glow-in-the-dark (lights go off) · holographic · magic (colour changes as you knead).
-Bottom row = new lump (starts the make-slime ritual; tap again to skip) · sparkle ·
+Bottom row = new lump · bowl (make slime from scratch) · themes (ice cream, unicorn,
+galaxy, rainbow, lemonade, mint: one tap sets colours, kind, add-ins and scent) · sparkle ·
 beads · stars · star stamp · heart stamp · knife (drag to slice) · camera (saves to the
 tablet's Pictures) · jars (shelf of six: tap an empty jar to save, a full one to reopen,
-hold to overwrite). A wet kneading sound follows how fast you move. Works in landscape
-and portrait.
+hold to overwrite) · scent (strawberry, lemon, blueberry, mint, chocolate, bubblegum: little
+puffs rise where you touch). A wet kneading sound follows how fast you move. Works in
+landscape and portrait; Android back closes overlays instead of quitting.
+
+**First run** is a guided make-slime opening: a cartoon hand shows what to tap, the four
+steps (glue, colour, activator, stir) are icons across the top, the colour bottles sit right
+under the bowl, and a go button in the corner skips straight to a lump.
 
 - Godot 4.7 / GDScript. The slime is a lump on a table simulated as a thickness field on
   an 80x52 grid: fingers press (crater + displaced rim), smear (semi-Lagrangian advection

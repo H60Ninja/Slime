@@ -12,6 +12,8 @@ signal held               ## finger held still on slime for a moment (sound hook
 signal style_changed(style: String)
 signal kneading(speed: float)   ## every physics tick: fastest finger speed on slime (0 when idle)
 signal sliced
+signal touch_at(px: Vector2)     ## finger down on slime (local px)
+signal knead_at(px: Vector2)     ## throttled: a finger moving on slime (local px)
 
 var GW := 80
 var GH := 52
@@ -238,10 +240,10 @@ func reset() -> void:
 
 
 ## Pour a drop of the selected colour onto the lump (adds a little slime too).
-func drop(col: Color) -> void:
+func drop(col: Color, offset := Vector2.ZERO) -> void:
 	color = col
 	var ks := to_ks(col)
-	var c := _centroid()
+	var c := _centroid() + offset
 	var r := drop_px / _cell.x
 	var r2 := r * r
 	var x0 := maxi(0, int(c.x - r))
@@ -476,6 +478,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			var inside := _sample(g.x - 0.5, g.y - 0.5) > 0.05
 			_fingers[event.index] = {"pos": g, "prev": g, "still": 0, "held": false, "inside": inside}
 			touched.emit(inside)
+			if inside:
+				touch_at.emit(to_px(g))
 		elif _fingers.has(event.index):
 			var inside := _sample(g.x - 0.5, g.y - 0.5) > 0.05
 			_fingers.erase(event.index)
@@ -501,6 +505,8 @@ func _physics_process(delta: float) -> void:
 		var on_slime := _sample(pos.x - 0.5, pos.y - 0.5) > 0.05
 		if on_slime:
 			top_speed = maxf(top_speed, speed)
+			if speed > 0.25 and _tick % 8 == 0:
+				knead_at.emit(to_px(pos))
 		if speed > 0.03:
 			_smear(pos, v * _smear_mult, rf * 1.9)
 			addins.advect(pos, v * smear_strength, rf * 1.9)

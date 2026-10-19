@@ -1,6 +1,6 @@
 # Store listing material
 
-Same text for both stores. Package `com.h60ninja.slime`, version 0.1.0 (versionCode 1).
+Same text for both stores. Package `com.h60ninja.slime`, version 1.0.0 (versionCode 2).
 
 ## Title
 Slime: No Ads Sensory Play
@@ -23,6 +23,8 @@ slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like
 - 10 bright colours: pour drops in and swirl them like real paint — yellow and blue make green
 - Ten slime kinds: shiny, clear, metallic, cloud, crunchy, butter, fluffy, glow-in-the-dark,
   holographic and colour-changing magic slime — plus sparkle
+- Six themed slimes in one tap: ice cream, unicorn, galaxy, rainbow, lemonade, mint
+- Scented slime: strawberry, lemon, blueberry, mint, chocolate or bubblegum puffs
 - Slice it with the knife and watch it heal
 - Keep up to six slimes in jars on the shelf and come back to them
 - Make your own slime first: pour the glue, pick a colour, add activator, stir it up

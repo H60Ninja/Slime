@@ -7,6 +7,18 @@ const UIScript := preload("res://scripts/ui.gd")
 const PourScript := preload("res://scripts/pour.gd")
 const MixingScript := preload("res://scripts/mixing.gd")
 const JarsScript := preload("res://scripts/jars.gd")
+const PickerScript := preload("res://scripts/picker.gd")
+const ScentsScript := preload("res://scripts/scents.gd")
+const HandScript := preload("res://scripts/hand.gd")
+
+const THEMES := {
+	"icecream": {"color": Color("ff9ad5"), "style": "cloud", "sparkle": false, "drops": [Color("fff2bf"), Color("9fd8ff")], "beads": 14, "stars": 0, "scent": "strawberry"},
+	"unicorn":  {"color": Color("ffb6de"), "style": "holo", "sparkle": true, "drops": [Color("c58bff"), Color("7fd3ff")], "beads": 0, "stars": 10, "scent": "bubblegum"},
+	"galaxy":   {"color": Color("2c2c5e"), "style": "glow", "sparkle": true, "drops": [Color("9d6bff"), Color("4fb8ff")], "beads": 0, "stars": 12, "scent": ""},
+	"rainbow":  {"color": Color("ff4d4d"), "style": "magic", "sparkle": false, "drops": [Color("ffe44d"), Color("4fb8ff"), Color("6fe36a")], "beads": 0, "stars": 0, "scent": ""},
+	"lemonade": {"color": Color("ffe44d"), "style": "clear", "sparkle": false, "drops": [Color("f4f4ff")], "beads": 8, "stars": 0, "scent": "lemon"},
+	"mint":     {"color": Color("3fe0b8"), "style": "crunchy", "sparkle": false, "drops": [Color("f4f4ff")], "beads": 0, "stars": 0, "scent": "mint"},
+}
 
 var slime: Node2D
 var ui: CanvasLayer
@@ -33,6 +45,11 @@ var _knife_trail: KnifeTrail
 var _wet_target_db := -60.0
 var _bg: TextureRect
 var _bg_dark: ColorRect
+var themes: CanvasLayer
+var scents_picker: CanvasLayer
+var scents: Node2D
+var _hint: Node2D
+var _hint_t := 0.0
 var _fps_timer := 0.0
 var _snapping := false
 
@@ -52,6 +69,9 @@ func _ready() -> void:
 	ui.style_picked.connect(func(s: String): slime.style = s; slime.wobble(0.6); _play(_touch_sound()); _save())
 	ui.sparkle_toggled.connect(func(on: bool): slime.sparkle = on; _play(_pop); _save())
 	ui.reset_pressed.connect(_on_new)
+	ui.bowl_pressed.connect(func(): if not mixing: _start_mixing())
+	ui.themes_pressed.connect(func(): if not mixing: themes.open(); _play(_click))
+	ui.scents_pressed.connect(func(): if not mixing: scents_picker.open(scents.scent); _play(_click))
 	ui.addin_pressed.connect(func(kind: int): slime.addins.sprinkle(kind, 10); _play(_sprinkle))
 	ui.stamp_pressed.connect(func(shape: String): slime.stamp(shape); _play(_squelch))
 	ui.snapshot_pressed.connect(_snapshot)
@@ -59,6 +79,8 @@ func _ready() -> void:
 	ui.jars_pressed.connect(func(): if not mixing: jars.open(); _play(_jar))
 	slime.kneading.connect(_on_kneading)
 	slime.style_changed.connect(_on_style_changed)
+	slime.touch_at.connect(func(px: Vector2): scents.puff(px, 3); _hide_hint())
+	slime.knead_at.connect(func(px: Vector2): scents.puff(px, 1))
 	slime.sliced.connect(func(): _play(_slice_crunch if slime.style == "crunchy" else _slice_wet))
 	slime.touched.connect(func(inside: bool): if inside: _play(_touch_sound()))
 	slime.released.connect(func(inside: bool): if inside: _play(_pop); slime.wobble(0.3))
@@ -95,6 +117,34 @@ func _ready() -> void:
 	jars.setup(func(): return slime.get_state(), _thumb_image)
 	jars.jar_saved.connect(func(_i: int): _play(_jar))
 	jars.jar_loaded.connect(func(_i: int, st: Dictionary): slime.set_state(st); ui.set_state(slime.color, slime.style, slime.sparkle); _play(_slurp); _save())
+
+	scents = ScentsScript.new()
+	scents.name = "Scents"
+	scents.z_index = 8
+	add_child(scents)
+
+	themes = PickerScript.new()
+	themes.name = "Themes"
+	add_child(themes)
+	var titems := []
+	for id in THEMES:
+		titems.append({"id": id, "draw": _draw_theme_tile.bind(id)})
+	themes.setup(titems, 3)
+	themes.picked.connect(_apply_theme)
+
+	scents_picker = PickerScript.new()
+	scents_picker.name = "ScentsPicker"
+	add_child(scents_picker)
+	var sitems := [{"id": "", "draw": _draw_scent_tile.bind("")}]
+	for k in ScentsScript.KINDS:
+		sitems.append({"id": k, "draw": _draw_scent_tile.bind(k)})
+	scents_picker.setup(sitems, 4)
+	scents_picker.picked.connect(func(id: String): scents.scent = id; ui.set_scent(id); _play(_sprinkle); _save())
+
+	_hint = HandScript.new()
+	_hint.z_index = 20
+	_hint.visible = false
+	add_child(_hint)
 
 	_knife_trail = KnifeTrail.new()
 	_knife_trail.z_index = 10
@@ -156,8 +206,10 @@ func _layout() -> void:
 		get_tree().root.content_scale_size = want
 	var vp := Vector2(want)
 	var side := 24.0 + 88.0 + 30.0
-	_play_area = Rect2(side, 60, vp.x - side * 2.0, vp.y - 60 - 150)
+	var bottom := 270.0 if portrait else 150.0
+	_play_area = Rect2(side, 60, vp.x - side * 2.0, vp.y - 60 - bottom)
 	slime.play_area = _play_area
+	ui.set_portrait(portrait)
 	if mixing:
 		mixing.set_area(_play_area)
 
@@ -183,11 +235,14 @@ func _start_mixing() -> void:
 	mixing = MixingScript.new()
 	mixing.name = "Mixing"
 	mixing.set_area(_play_area)
-	mixing.need_color.connect(func(on: bool): ui.pulse_palette(on))
 	mixing.poured.connect(func(): _play(_slurp))
 	mixing.stirring.connect(func(): _play(_squish.pick_random()))
+	mixing.color_chosen.connect(_on_mix_color)
+	mixing.skipped.connect(func(): if mixing: mixing.queue_free(); _on_mixed(slime.color); _play(_pop))
 	mixing.done.connect(_on_mixed)
 	add_child(mixing)
+	ui.set_ritual_mode(true)
+	_hide_hint()
 	slime.visible = false
 	slime.set_process_unhandled_input(false)
 	slime.set_physics_process(false)
@@ -197,9 +252,20 @@ func _start_mixing() -> void:
 		ui.set_knife(false)
 
 
+func _on_mix_color(col: Color, from: Vector2) -> void:
+	var pour := PourScript.new()
+	pour.color = col
+	pour.start = from
+	pour.target = mixing.bowl_center
+	pour.position = from
+	pour.landed.connect(func(c: Color, _at: Vector2): if mixing: mixing.add_color(c); slime.color = c; _play(_slurp))
+	add_child(pour)
+	_play(_pop)
+
+
 func _on_mixed(col: Color) -> void:
 	mixing = null
-	ui.pulse_palette(false)
+	ui.set_ritual_mode(false)
 	slime.color = col
 	slime.reset()
 	slime.visible = true
@@ -207,29 +273,118 @@ func _on_mixed(col: Color) -> void:
 	slime.set_physics_process(true)
 	_play(_slurp)
 	_save()
+	_show_hint()
 
 
+## First touch hint: a hand presses the lump, then smears it.
+func _show_hint() -> void:
+	var c: Vector2 = slime.drop_target()
+	_hint.drag(c + Vector2(-120, -40), c + Vector2(140, 60))
+	_hint_t = 7.0
+
+
+func _hide_hint() -> void:
+	_hint_t = 0.0
+	_hint.hide_hand()
+
+
+## + gives a fresh lump straight away; the bowl button runs the ritual.
 func _on_new() -> void:
 	if mixing:
-		# second tap on + skips the ritual
-		mixing.queue_free()
-		_on_mixed(slime.color)
 		return
-	_start_mixing()
+	slime.reset()
+	scents.puff(slime.drop_target(), 4)
+	_play(_slurp)
 
 
 func _on_color(c: Color, from: Vector2) -> void:
 	var pour := PourScript.new()
 	pour.color = c
 	pour.start = from
-	pour.target = mixing.bowl_center if mixing else slime.drop_target()
+	pour.target = slime.drop_target()
 	pour.position = from
-	if mixing:
-		pour.landed.connect(func(col: Color, _at: Vector2): if mixing: mixing.add_color(col); slime.color = col; _play(_slurp); _save())
-	else:
-		pour.landed.connect(func(col: Color, _at: Vector2): slime.drop(col); _play(_slurp); _save())
+	pour.landed.connect(func(col: Color, _at: Vector2): slime.drop(col); scents.puff(slime.drop_target(), 3); _play(_slurp); _save())
 	add_child(pour)
 	_play(_pop)
+
+
+func _apply_theme(id: String) -> void:
+	var t: Dictionary = THEMES[id]
+	slime.color = t["color"]
+	slime.style = t["style"]
+	slime.sparkle = t["sparkle"]
+	slime.reset()
+	var drops: Array = t["drops"]
+	for i in drops.size():
+		var a := TAU * i / drops.size() + 0.7
+		slime.drop(drops[i], Vector2(cos(a), sin(a)) * 7.0)
+	slime.color = t["color"]
+	if t["beads"] > 0:
+		slime.addins.sprinkle(0, t["beads"])
+	if t["stars"] > 0:
+		slime.addins.sprinkle(1, t["stars"])
+	scents.scent = t["scent"]
+	ui.set_scent(scents.scent)
+	ui.set_state(slime.color, slime.style, slime.sparkle)
+	scents.puff(slime.drop_target(), 5)
+	_play(_slurp)
+	_save()
+
+
+func _draw_theme_tile(c: CanvasItem, r: Rect2, id: String) -> void:
+	var t: Dictionary = THEMES[id]
+	var centre := r.get_center()
+	var rad := r.size.x * 0.34
+	var base: Color = t["color"]
+	c.draw_circle(centre + Vector2(6, 10), rad, Color(0, 0, 0, 0.12))
+	c.draw_circle(centre, rad, base)
+	var drops: Array = t["drops"]
+	for i in drops.size():
+		var a := TAU * i / drops.size() + 0.7
+		c.draw_circle(centre + Vector2(cos(a), sin(a)) * rad * 0.45, rad * 0.3, drops[i])
+	c.draw_circle(centre + Vector2(-rad * 0.4, -rad * 0.45), rad * 0.22, Color(1, 1, 1, 0.75))
+	if t["sparkle"]:
+		for q: Vector2 in [Vector2(0.6, -0.7), Vector2(-0.8, 0.2), Vector2(0.4, 0.75)]:
+			var p: Vector2 = centre + q * rad
+			c.draw_line(p + Vector2(-9, 0), p + Vector2(9, 0), Color.WHITE, 3.0, true)
+			c.draw_line(p + Vector2(0, -9), p + Vector2(0, 9), Color.WHITE, 3.0, true)
+	if t["beads"] > 0:
+		for q: Vector2 in [Vector2(0.3, 0.3), Vector2(-0.5, 0.5), Vector2(0.1, -0.3)]:
+			c.draw_circle(centre + q * rad, 6, Color("ffffff"))
+	if t["stars"] > 0:
+		for q: Vector2 in [Vector2(0.5, 0.5), Vector2(-0.6, -0.3)]:
+			var p: Vector2 = centre + q * rad
+			var pts := PackedVector2Array()
+			for i in 10:
+				var rr := 10.0 if i % 2 == 0 else 4.5
+				var ang := -PI / 2 + TAU * i / 10
+				pts.append(p + Vector2(cos(ang), sin(ang)) * rr)
+			c.draw_colored_polygon(pts, Color("ffd84d"))
+	if t["scent"] != "":
+		c.draw_set_transform(r.position + Vector2(r.size.x - 34, 34), 0.0, Vector2(0.9, 0.9))
+		ScentsScript.draw_icon(c, t["scent"], 1.0)
+		c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_scent_tile(c: CanvasItem, r: Rect2, kind: String) -> void:
+	c.draw_set_transform(r.get_center(), 0.0, Vector2(2.6, 2.6))
+	ScentsScript.draw_icon(c, kind, 1.0)
+	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		# Android back: close whatever is open, never quit by accident
+		if jars.visible:
+			jars.close()
+		elif themes.visible:
+			themes.close()
+		elif scents_picker.visible:
+			scents_picker.close()
+		elif _knife:
+			_knife = false
+			ui.set_knife(false)
+			_on_knife(false)
 
 
 # ---------------------------------------------------------------- snapshot
@@ -430,6 +585,7 @@ func _save() -> void:
 	cf.set_value("slime", "color", slime.color)
 	cf.set_value("slime", "sparkle", slime.sparkle)
 	cf.set_value("slime", "style", slime.style)
+	cf.set_value("slime", "scent", scents.scent)
 	cf.save(SETTINGS)
 
 
@@ -442,11 +598,17 @@ func _load() -> bool:
 	slime.sparkle = cf.get_value("slime", "sparkle", false)
 	slime.style = cf.get_value("slime", "style", "shiny")
 	slime.reset()
+	scents.scent = cf.get_value("slime", "scent", "")
+	ui.set_scent(scents.scent)
 	ui.set_state(slime.color, slime.style, slime.sparkle)
 	return true
 
 
 func _process(delta: float) -> void:
+	if _hint_t > 0.0:
+		_hint_t -= delta
+		if _hint_t <= 0.0:
+			_hint.hide_hand()
 	if _wet:
 		_wet.volume_db = lerpf(_wet.volume_db, _wet_target_db, minf(1.0, delta * 8.0))
 	if OS.is_debug_build():
