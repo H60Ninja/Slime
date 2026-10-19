@@ -31,6 +31,8 @@ var _squelches: Array[AudioStreamPlayer] = []
 var _stretches: Array[AudioStreamPlayer] = []
 var _sprinkle: AudioStreamPlayer
 var _crackles: Array[AudioStreamPlayer] = []
+var _kind_voices := {}   # style -> Array[AudioStreamPlayer] (finger-lands sound per kind)
+const KIND_PITCH := {"shiny": 0.0, "clear": 0.22, "metal": 0.05, "cloud": -0.18, "crunchy": 0.0, "butter": -0.25, "fluffy": -0.15, "glow": -0.05, "holo": 0.12, "magic": 0.08}
 var _poofs: Array[AudioStreamPlayer] = []
 var _click: AudioStreamPlayer
 var _bubble: Array[AudioStreamPlayer] = []
@@ -103,6 +105,11 @@ func _ready() -> void:
 		_crackles.append(_player("res://assets/sfx/crackle%d.wav" % k, -3.0))
 	for k in 2:
 		_poofs.append(_player("res://assets/sfx/poof%d.wav" % k, -2.0))
+	for fam in ["jelly", "metal", "cloud", "butter", "glow", "holo", "magic"]:
+		var arr: Array[AudioStreamPlayer] = []
+		for k in 3:
+			arr.append(_player("res://assets/sfx/%s%d.wav" % [fam, k], -1.5))
+		_kind_voices[fam] = arr
 	_sprinkle = _player("res://assets/sfx/sprinkle.wav", -3.0)
 	_click = _player("res://assets/sfx/click.wav", -6.0)
 	for k in 4:
@@ -165,13 +172,23 @@ func _ready() -> void:
 		_start_mixing()
 
 
+## Each kind on the left column has its own landing voice.
 func _touch_sound() -> AudioStreamPlayer:
 	match slime.style:
 		"crunchy":
 			return _crackles.pick_random()
 		"fluffy":
 			return _poofs.pick_random()
+		"clear":
+			return _kind_voices["jelly"].pick_random()
+		"metal", "cloud", "butter", "glow", "holo", "magic":
+			return _kind_voices[slime.style].pick_random()
 	return _squish.pick_random()
+
+
+## Kinds also colour the shared sounds (squelch, stretch, pop) by pitch.
+func _kind_pitch() -> float:
+	return KIND_PITCH.get(slime.style, 0.0)
 
 
 func _build_background() -> void:
@@ -257,7 +274,7 @@ func _player(path: String, db := 0.0) -> AudioStreamPlayer:
 
 
 func _play(p: AudioStreamPlayer) -> void:
-	p.pitch_scale = randf_range(0.9, 1.12)
+	p.pitch_scale = randf_range(0.9, 1.12) + (_kind_pitch() if slime else 0.0)
 	p.play()
 
 
@@ -563,11 +580,7 @@ func _on_style_changed(st: String) -> void:
 func _on_kneading(speed: float) -> void:
 	var k := clampf(speed / 1.4, 0.0, 1.0)
 	_wet_target_db = lerpf(-60.0, -8.0, sqrt(k))
-	_wet.pitch_scale = 0.8 + 0.6 * k
-	if slime.style == "clear":
-		_wet.pitch_scale += 0.25
-	elif slime.style in ["butter", "fluffy", "cloud"]:
-		_wet.pitch_scale -= 0.2
+	_wet.pitch_scale = 0.8 + 0.6 * k + _kind_pitch() * 1.2
 
 
 func _thumb_image() -> Image:

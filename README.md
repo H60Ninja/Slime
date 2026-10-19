@@ -15,7 +15,7 @@ galaxy, rainbow, lemonade, mint: one tap sets colours, kind, add-ins and scent) 
 beads · stars · star stamp · heart stamp · knife (drag to slice) · camera (saves to the
 tablet's Pictures) · jars (shelf of six: tap an empty jar to save, a full one to reopen,
 hold to overwrite) · scent (strawberry, lemon, blueberry, mint, chocolate, bubblegum: little
-puffs rise where you touch). A wet kneading sound follows how fast you move. Works in
+puffs rise where you touch). Every kind has its own voice when you touch it (watery jelly, metallic tang, muffled cloud, low buttery smear, glowing hum, glassy holographic sparkle, magic twinkle, crackle, poof) and colours the shared squelch, stretch and pop by pitch. A wet kneading sound follows how fast you move. Works in
 landscape and portrait; Android back closes overlays instead of quitting.
 
 **First run** is a guided make-slime opening: a cartoon hand shows what to tap, the four

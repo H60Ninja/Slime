@@ -253,8 +253,8 @@ def bubble(rnd, f0, dur, amp=1.0):
 
 SQUISH_RECS = ["slime_04", "slime_16", "slime_15", "squish_04", "slime_02"]
 POP_RECS = ["squishsplat_impact", "squish_03", "squish_01", "mud_24"]
-SQUELCH_RECS = ["mud_08", "mud_13", "mud_12"]
-STRETCH_RECS = ["slime_14", "slime_07", "slime_01"]
+SQUELCH_RECS = ["slime_09", "slime_10", "mud_19"]
+STRETCH_RECS = ["slime_11", "slime_08", "slime_03"]
 SLURP_RECS = ["splash_10", "splash_06"]
 
 
@@ -312,21 +312,21 @@ def squelch(seed):
         for i, v in enumerate(b):
             if t + i < n:
                 bubs[t + i] += v
-    return fade_edges(mix(gain_list(body, 0.4 if r else 1.0), clicks, th, bubs, r))
+    return fade_edges(mix(gain_list(body, 0.25 if r else 1.0), gain_list(clicks, 0.7), th, bubs, r))
 
 
 def stretch(seed):
     """Fast pull: rising wet tear with crackle that gets finer as it thins."""
     rnd = random.Random(seed)
     n = int(SR * 0.5)
-    r = rec(STRETCH_RECS[seed % len(STRETCH_RECS)], 0.5, 0.8)
+    r = rec(STRETCH_RECS[seed % len(STRETCH_RECS)], 0.5, 0.95, start_at_attack=False)
     body = wet_body(rnd, n, lambda i: 500 + 2400 * (i / n) ** 1.6,
                     lambda i: 70 - 50 * i / n, 0.9)
     e = [math.sin(math.pi * i / n) ** 1.1 for i in range(n)]
     body = [body[i] * e[i] for i in range(n)]
     clicks = sticky_clicks(rnd, n, lambda i: 60 + 420 * (i / n) ** 2, f_lo=2800, f_hi=7000, amp=0.75, shape=lambda i: e[i])
     rel = release_tail(rnd, 4200, 900, 0.09, 0.7)
-    out = mix(gain_list(body, 0.45 if r else 1.0), clicks, r)
+    out = mix(gain_list(body, 0.3 if r else 1.0), gain_list(clicks, 0.8), r)
     for i, v in enumerate(rel):
         j = int(n * 0.82) + i
         if j < n:
@@ -374,6 +374,116 @@ def slurp(seed):
     clicks = sticky_clicks(rnd, n, lambda i: 120 * (1 - i / n), amp=0.4)
     r = rec(SLURP_RECS[seed % len(SLURP_RECS)], 0.42, 0.85)
     return fade_edges(mix(th, gain_list(body, 0.4 if r else 1.0), bubs, clicks, r))
+
+
+# ---------------------------------------------------------------- per-kind voices
+
+def sine_tail(f, dur, amp, decay=4.0, vib=0.0):
+    n = int(SR * dur)
+    out = []
+    ph = 0.0
+    for i in range(n):
+        k = i / n
+        ph += 2 * math.pi * f * (1 + vib * math.sin(2 * math.pi * 6 * i / SR)) / SR
+        out.append(math.sin(ph) * (1 - k) ** decay * amp * min(1.0, i / (SR * 0.003)))
+    return out
+
+
+def jelly(seed):
+    """Clear slime: watery, bubbly, higher and cleaner than shiny."""
+    rnd = random.Random(seed)
+    n = int(SR * 0.3)
+    r = rec(["splash_14", "splash_02", "splash_07"][seed % 3], 0.3, 0.8)
+    bubs = [0.0] * n
+    for _ in range(5):
+        b = bubble(rnd, rnd.uniform(900, 2200), rnd.uniform(0.03, 0.06), 0.5)
+        t = rnd.randint(int(n * 0.05), int(n * 0.7))
+        for i, v in enumerate(b):
+            if t + i < n:
+                bubs[t + i] += v
+    clicks = sticky_clicks(rnd, n, lambda i: 110 * (1 - i / n), f_lo=3000, f_hi=7000, amp=0.4)
+    return fade_edges(mix(highpass(r, 350) if r else [], bubs, clicks))
+
+
+def metal(seed):
+    """Metallic slime: squish with a short ringing tang."""
+    rnd = random.Random(seed)
+    base = squish(seed + 300)
+    n = len(base)
+    ring = [0.0] * n
+    for f, a in [(2960, 0.5), (4420, 0.35), (6180, 0.2)]:
+        f *= rnd.uniform(0.96, 1.04)
+        t = sine_tail(f, 0.22, a, 5.0)
+        for i, v in enumerate(t):
+            if i < n:
+                ring[i] += v
+    c = comb(base, lambda i: 9.0 + 2.0 * math.sin(i * 0.001), feedback=0.8, mix=0.5)
+    return fade_edges(mix(gain_list(c, 0.8), ring))
+
+
+def cloud(seed):
+    """Cloud slime: muffled, soft, almost no clicks."""
+    base = squish(seed + 400)
+    soft = lowpass(base, lambda i: 900)
+    air = poof(seed + 400)
+    return fade_edges(mix(soft, gain_list(air, 0.35)))
+
+
+def butter(seed):
+    """Butter slime: low, smooth smear, no clicks."""
+    rnd = random.Random(seed)
+    n = int(SR * 0.34)
+    r = rec(["mud_04", "mud_19", "slime_13"][seed % 3], 0.34, 0.9)
+    r = lowpass(r, lambda i: 700) if r else []
+    e = [math.sin(math.pi * min(1.0, i / (n * 0.95))) ** 1.3 for i in range(n)]
+    body = wet_body(rnd, n, lambda i: 220 + 260 * (0.5 + 0.5 * math.sin(2 * math.pi * 3 * i / SR)), lambda i: 90 + 30 * math.sin(i * 0.0005), 0.6)
+    body = [body[i] * e[i] for i in range(n)]
+    th = [v * e[i] for i, v in enumerate(thump(n, 80, 55, 0.5))]
+    return fade_edges(mix(r, body, th))
+
+
+def glow(seed):
+    """Glow slime: squish with a soft ethereal hum underneath."""
+    base = squish(seed + 500)
+    n = len(base)
+    hum = [0.0] * n
+    for f, a in [(392, 0.25), (587.3, 0.18), (784, 0.12)]:
+        t = sine_tail(f, 0.3, a, 1.8, vib=0.004)
+        for i, v in enumerate(t):
+            if i < n:
+                hum[i] += v
+    return fade_edges(mix(gain_list(base, 0.85), hum))
+
+
+def holo(seed):
+    """Holographic slime: squish plus a glassy little descending sparkle."""
+    rnd = random.Random(seed)
+    base = squish(seed + 600)
+    n = len(base)
+    spark = [0.0] * n
+    for k, f in enumerate([2637, 2093, 1760, 1319]):
+        t = sine_tail(f * rnd.uniform(0.99, 1.01), 0.09, 0.3, 3.0)
+        off = int(SR * (0.03 + 0.045 * k))
+        for i, v in enumerate(t):
+            if off + i < n:
+                spark[off + i] += v
+    return fade_edges(mix(gain_list(base, 0.85), spark))
+
+
+def magic(seed):
+    """Colour-changing slime: squish plus a rising twinkle of random high notes."""
+    rnd = random.Random(seed)
+    base = squish(seed + 700)
+    n = len(base)
+    tw = [0.0] * n
+    for k in range(7):
+        f = rnd.uniform(1500, 4200) * (1 + 0.1 * k)
+        t = sine_tail(f, 0.06, 0.22, 3.0)
+        off = int(SR * (0.02 + 0.03 * k)) + rnd.randint(0, int(SR * 0.01))
+        for i, v in enumerate(t):
+            if off + i < n:
+                tw[off + i] += v
+    return fade_edges(mix(gain_list(base, 0.85), tw))
 
 
 def bubble_pop(seed):
@@ -497,6 +607,9 @@ if __name__ == "__main__":
         write(os.path.join(out, f"slurp{k}.wav"), slurp(70 + k))
     for k in range(4):
         write(os.path.join(out, f"bubble{k}.wav"), bubble_pop(80 + k))
+    for fam, fn in [("jelly", jelly), ("metal", metal), ("cloud", cloud), ("butter", butter), ("glow", glow), ("holo", holo), ("magic", magic)]:
+        for k in range(3):
+            write(os.path.join(out, f"{fam}{k}.wav"), fn(200 + k))
     write(os.path.join(out, "sprinkle.wav"), sprinkle(90))
     write(os.path.join(out, "click.wav"), click(91))
     for k in range(2):

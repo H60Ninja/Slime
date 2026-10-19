@@ -33,7 +33,7 @@ slowly relaxes, like the real thing. Tap plus for a fresh lump whenever you like
 - Sprinkle in beads and stars that sink in and ride along with the slime
 - Star and heart cookie-cutter stamps
 - Bubbles rise under a held finger and pop when you sweep through them
-- Real recorded slime squishes, stretches, squelches, bubbles, crackles and pops that follow your hands
+- Real recorded slime squishes, stretches, squelches, bubbles, crackles and pops that follow your hands, and every slime kind has its own voice
 - No timers, no scores, no pressure: good for quiet time, waiting rooms and sensory breaks
 - No text to read, no menus to get lost in
 - No ads, no in-app purchases, no internet, no data collection
