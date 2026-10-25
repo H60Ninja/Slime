@@ -1,20 +1,22 @@
 # Slime — Project Plan (creation to shipping)
 
-## Status (updated 2026-10-17 evening)
+## Status (updated 2026-10-24 — paused, app is live)
 
 | Phase | State |
 |---|---|
-| 0 Toolchain | ✅ done — emulator, two AVDs, Godot 4.7.2 + templates, debug + release keystores |
-| 1 Skeleton | ✅ done — repo, Makefile, presets, CLAUDE.md |
-| 2 Slime | ✅ v2 **moldable lump** (thickness field): press leaves craters with rims, drags carry slime into strands, pinches pile ridges, spreads thin; shapes persist and slowly slump. 60 fps on the API 30 emulator. v1 ring-blob replaced 2026-10-17 after Adam reviewed competitor apps |
-| 3 Features | ✅ colour drops + paint-style swirl mixing (Kubelka-Munk per-cell colour field), 4 styles (shiny/clear/metal/cloud), sparkle, beads + stars add-ins that ride the slime, star/heart stamps, pour animation with splash, bubbles that rise and pop, 10 sounds, settings persist |
-| 3b Research round | ✅ 2026-10-18 — speed-responsive wet loop, glow/holo/magic kinds, knife, jar shelf (6 saves), listing rewritten around "no ads / sensory". See `docs/market-research.md` |
-| 3c UX + release prep | ✅ 2026-10-18 — guided opening (hand cue, step icons, colour bottles under the bowl, go button, chrome hidden), themed sets, scented puffs, press bounce, Android back handling, first-touch hint, v1.0.0 / versionCode 2, `store/checklist.md` |
-| 3d Feature pass 3 | ✅ 2026-10-18 — glue grows the lump (cap 2.4×), thickness-dependent slump, two-finger pinch ridges, rolling pin, circle/flower stamps, 8-step undo, toolbar regrouped into pickers; Slime Shop framework (store.gd + hold-to-confirm gate + lock badges) hidden until a billing plugin exists |
-| 4 Polish | ✅ v2 — make-slime ritual on first run, 7 kinds (crunchy/butter/fluffy added with own sounds), snapshot to Pictures via MediaStore, portrait + landscape, generated icon + feature graphic, privacy page, 6 store screenshots. Tested by Adam on the onn. kids tablet 2026-10-18: works. Fire OS pass still pending |
-| 5 Amazon | ⏳ ready to submit: `build/slime-release.apk`, all assets, field-by-field guide in `docs/amazon-submission.md`. Needs Adam: developer account + ID verification |
-| 6 Google | ⏳ ready to upload: `build/slime-release.aab`. Needs Adam's Play account + 12 testers |
-| 7 Maint. | — |
+| 0 Toolchain | ✅ emulator, two AVDs, Godot 4.7.2 + templates, debug + release keystores |
+| 1 Skeleton | ✅ repo, Makefile, presets, CLAUDE.md |
+| 2 Slime | ✅ v2 **moldable lump** (thickness field): craters, strands, pinch ridges, spread thin; shapes persist and slowly slump; 60 fps on the Fire-class emulator |
+| 3 Features | ✅ paint-style colour mixing (Kubelka-Munk), 10 kinds each with its own voice, pour animation, bubbles, beads/stars that sink, 4 stamps, knife, rolling pin, glue growth, 8-step undo, 6 themes, 6 scents, jar shelf, snapshot to Pictures, make-slime opening with hand cue, portrait + landscape |
+| 3e Sound | ✅ layered synthesis over CC0 OpenGameArt recordings (`art/cc0/LICENSE.md`), stereo kneading bed, Slime bus |
+| 4 Release prep | ✅ v1.0.0 / versionCode 2, icons, promo, 10 screenshots, privacy page, `store/checklist.md`; tested by Adam on an onn. kids tablet and installed on a Fire 7 (Fire OS 8) |
+| 5 Amazon | ✅ **LIVE 2026-10-24** — "Squish! Slime for Kids" by DadBuilt Apps, free, Fire tablets, audience 0–12. Submitted 2026-10-18 |
+| 5b Windows | ✅ `make export-windows` single-file exe (untested on real Windows; copied to Adam's USB stick 2026-10-19) |
+| 6 Google Play | ⏳ AAB built and listing ready. Needs Adam: $25 account + ID check, 12 closed testers for 14 days, then Teacher Approved opt-in |
+| 7 Growth | ⏳ `docs/launch-plan.md`. daddit forbids promotion (rule 3); use r/kindlefire, r/SideProject, r/godot, Common Sense Media submission, OT emails, friends' honest ratings |
+| 8 Shop | ⏸ 99c unlock built and hidden (`store.gd`); decision: stay free, revisit only if installs justify a billing afternoon |
+
+**Paused 2026-10-24.** Next session: Adam's store link to check the live page; Google Play if he wants the Kids Space tablet covered; a small update every month or two keeps the listing fresh.
 
 See `store/listing.md` for the exact submission steps and listing text.
 
