@@ -26,7 +26,7 @@ Tick in order. Everything in **bold** needs Adam personally.
 - [x] Add New App → Android → uploaded `slime-release.apk` (versionCode 2), DRM: No.
 - [x] Target: 12 Fire tablets, no Fire TV/Automotive. Audience 0–12. Content rating all None/No. User data privacy No.
 - [x] Appstore Details: display title "Squish! Slime for Kids", text from `store/amazon/`, 10 screenshots, both icons, promo image.
-- [x] **Submitted 2026-10-18.** Review 1–3 days; status email goes to the account owner. Then share into each child profile (Settings → Profiles & Family Library → child → Add Content).
+- [x] **Submitted 2026-10-18. Approved and live 2026-10-24.** Then share into each child profile (Settings → Profiles & Family Library → child → Add Content).
 
 ## Google Play (Kids Space tablets)
 - [ ] **Create developer account** ($25, ID verification, personal). Register as individual.
