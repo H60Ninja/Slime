@@ -1,3 +1,7 @@
+---
+title: Privacy Policy
+---
+
 # Slime — Privacy Policy
 
 **Effective 2026-10-17**
