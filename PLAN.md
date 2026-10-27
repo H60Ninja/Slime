@@ -12,7 +12,7 @@
 | 4 Release prep | ✅ v1.0.0 / versionCode 2, icons, promo, 10 screenshots, privacy page, `store/checklist.md`; tested by Adam on an onn. kids tablet and installed on a Fire 7 (Fire OS 8) |
 | 5 Amazon | ✅ **LIVE 2026-10-24** — "Squish! Slime for Kids" by DadBuilt Apps, free, Fire tablets, audience 0–12. Submitted 2026-10-18 |
 | 5b Windows | ✅ `make export-windows` single-file exe (untested on real Windows; copied to Adam's USB stick 2026-10-19) |
-| 6 Google Play | ⏳ **Closed test approved by Google 2026-10-27** (personal account, app created, listing + all declarations done, AAB v2 on the Alpha track, testers via Google Group `squish-tester@googlegroups.com`). Next: share group link + opt-in link → 12 testers × 14 days → Apply for production → Teacher Approved opt-in |
+| 6 Google Play | ⏳ **Closed test approved by Google 2026-10-27** (personal account, app created, listing + all declarations done, AAB v2 on the Alpha track, testers via Google Groups `testers-community@googlegroups.com` (paid Testers Community Starter, 15 testers, bought 2026-10-27) plus `squish-tester@googlegroups.com` for family/friends). Next: share group link + opt-in link → 12 testers × 14 days → Apply for production → Teacher Approved opt-in |
 | 7 Growth | ⏳ `docs/launch-plan.md`. daddit forbids promotion (rule 3); use r/kindlefire, r/SideProject, r/godot, Common Sense Media submission, OT emails, friends' honest ratings |
 | 8 Shop | ⏸ 99c unlock built and hidden (`store.gd`); decision: stay free, revisit only if installs justify a billing afternoon |
 

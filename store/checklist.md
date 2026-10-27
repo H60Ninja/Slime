@@ -32,8 +32,8 @@ Tick in order. Everything in **bold** needs Adam personally.
 - [ ] **Create developer account** ($25, ID verification, personal). Register as individual.
 - [ ] Create app "Slime: No Ads Sensory Play", Game, Free.
 - [ ] App content: privacy URL · no ads · no login · target audience: 5 & under + 6–8 · Families self-certification · Data safety: no data collected · IARC rating (all "none").
-- [x] Closed testing track "Alpha": `slime-release.aab` uploaded, Google Group `squish-tester@googlegroups.com` as testers, approved by Google 2026-10-27.
-- [ ] Recruit 12 testers (group link + opt-in link), keep them opted in for 14 consecutive days.
+- [x] Closed testing track "Alpha": `slime-release.aab` uploaded, Google Groups `testers-community@googlegroups.com` (paid service) + `squish-tester@googlegroups.com` (friends) as testers, approved by Google 2026-10-27.
+- [ ] 12+ testers opted in for 14 consecutive days (Testers Community runs 16 days; add 2–3 real people for questionnaire feedback).
 - [ ] Apply for production access → Production release → review.
 - [ ] Grow → **Teacher Approved opt-in** on day one.
 - [ ] On the tablet: Kids Space → Parent menu → Add more apps → Slime.
