@@ -16,7 +16,8 @@
 | 7 Growth | ⏳ `docs/launch-plan.md`. daddit forbids promotion (rule 3); use r/kindlefire, r/SideProject, r/godot, Common Sense Media submission, OT emails, friends' honest ratings |
 | 8 Shop | ⏸ 99c unlock built and hidden (`store.gd`); decision: stay free, revisit only if installs justify a billing afternoon |
 
-**Paused 2026-10-27.** Google approved the closed test the same day. Next: send `https://groups.google.com/g/squish-tester` plus the "Join on the web" link from the Testers tab to friends (and r/AndroidClosedTesting if short). Also due before production: refresh the store screenshots (current ones predate glue/knife/roller/undo).
+**Paused 2026-10-27.** Google approved the closed test the same day. Testers Community (Starter, 15 testers) submitted 2026-10-27; testers expected on the track within hours, so the 14-day clock should start ~2026-10-27/28 and end ~2026-11-10/11.
+Plan: **around day 7 (~2026-11-03) ship v1.0.1 (versionCode 3) to the Alpha track** with one small kid-feedback tweak + refreshed store screenshots (current ones predate glue/knife/roller/undo), so the production questionnaire has a real "changed based on testing" answer. Day 15: Apply for production, then opt into Teacher Approved. Keep both tester groups on the Alpha track; never delete the track or change package/signing/declarations during the window.
 
 See `store/listing.md` for the exact submission steps and listing text.
 
