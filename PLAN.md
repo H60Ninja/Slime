@@ -12,11 +12,11 @@
 | 4 Release prep | ✅ v1.0.0 / versionCode 2, icons, promo, 10 screenshots, privacy page, `store/checklist.md`; tested by Adam on an onn. kids tablet and installed on a Fire 7 (Fire OS 8) |
 | 5 Amazon | ✅ **LIVE 2026-10-24** — "Squish! Slime for Kids" by DadBuilt Apps, free, Fire tablets, audience 0–12. Submitted 2026-10-18 |
 | 5b Windows | ✅ `make export-windows` single-file exe (untested on real Windows; copied to Adam's USB stick 2026-10-19) |
-| 6 Google Play | ⏳ AAB built and listing ready. Needs Adam: $25 account + ID check, 12 closed testers for 14 days, then Teacher Approved opt-in |
+| 6 Google Play | ⏳ **Closed test submitted for review 2026-10-27** (personal account, app created, listing + all declarations done, AAB v2 on the Alpha track, testers via Google Group `squish-tester@googlegroups.com`). Next: review email → share group link + opt-in link → 12 testers × 14 days → Apply for production → Teacher Approved opt-in |
 | 7 Growth | ⏳ `docs/launch-plan.md`. daddit forbids promotion (rule 3); use r/kindlefire, r/SideProject, r/godot, Common Sense Media submission, OT emails, friends' honest ratings |
 | 8 Shop | ⏸ 99c unlock built and hidden (`store.gd`); decision: stay free, revisit only if installs justify a billing afternoon |
 
-**Paused 2026-10-24.** Next session: Adam's store link to check the live page; Google Play if he wants the Kids Space tablet covered; a small update every month or two keeps the listing fresh.
+**Paused 2026-10-27.** Waiting on Google's review of the closed test. When it lands: send `https://groups.google.com/g/squish-tester` plus the "Join on the web" link from the Testers tab to friends (and r/AndroidClosedTesting if short). Also due before production: refresh the store screenshots (current ones predate glue/knife/roller/undo).
 
 See `store/listing.md` for the exact submission steps and listing text.
 
