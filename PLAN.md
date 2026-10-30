@@ -17,7 +17,7 @@
 | 8 Shop | ⏸ 99c unlock built and hidden (`store.gd`); decision: stay free, revisit only if installs justify a billing afternoon |
 
 **Paused 2026-10-27.** Google approved the closed test the same day. Testers Community (Starter, 15 testers) submitted 2026-10-27; testers expected on the track within hours, so the 14-day clock should start ~2026-10-27/28 and end ~2026-11-10/11.
-Plan: **around day 7 (~2026-11-03) ship v1.0.1 (versionCode 3) to the Alpha track** with one small kid-feedback tweak + refreshed store screenshots (current ones predate glue/knife/roller/undo), so the production questionnaire has a real "changed based on testing" answer. Day 15: Apply for production, then opt into Teacher Approved. Keep both tester groups on the Alpha track; never delete the track or change package/signing/declarations during the window.
+Plan (Testers Community recommends 2–3 updates during the window): **v1.0.1 (code 3) ~2026-11-02** with one small kid-feedback tweak + refreshed store screenshots (current ones predate glue/knife/roller/undo); **v1.0.2 (code 4) ~2026-11-07** with a second small change. Testers need do nothing; Play auto-updates opted-in devices. Day 15 (~2026-11-11): download their Production Access Report (Reports tab), Apply for production with real feedback wording, then opt into Teacher Approved. Keep both tester groups on the Alpha track; never delete the track or change package/signing/declarations during the window.
 
 See `store/listing.md` for the exact submission steps and listing text.
 
