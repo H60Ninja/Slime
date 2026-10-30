@@ -430,6 +430,8 @@ func _rebuild_pickers() -> void:
 		{"id": "heart", "draw": _draw_stamp_tile.bind("heart")},
 		{"id": "circle", "draw": _draw_stamp_tile.bind("circle")},
 		{"id": "flower", "draw": _draw_stamp_tile.bind("flower")},
+		{"id": "moon", "draw": _draw_stamp_tile.bind("moon")},
+		{"id": "fish", "draw": _draw_stamp_tile.bind("fish")},
 	]
 	stamps_picker.set_items(stitems)
 
@@ -535,8 +537,11 @@ func _draw_stamp_tile(c: CanvasItem, r: Rect2, shape: String) -> void:
 				var a := TAU * i / 60.0
 				var rr := 70.0 * (0.62 + 0.38 * absf(cos(2.5 * a)))
 				pts.append(centre + Vector2(cos(a), sin(a)) * rr)
+		_:
+			for q in slime._shape_polygon(shape, 72.0):
+				pts.append(centre + q)
 	pts.append(pts[0])
-	c.draw_polyline(pts, {"star": Color("8a8fa8"), "heart": Color("ff7aa8"), "circle": Color("4fb8ff"), "flower": Color("ff9b2f")}[shape], 12.0, true)
+	c.draw_polyline(pts, {"star": Color("8a8fa8"), "heart": Color("ff7aa8"), "circle": Color("4fb8ff"), "flower": Color("ff9b2f"), "moon": Color("ffd34f"), "fish": Color("3fcf8e")}[shape], 12.0, true)
 
 
 func _apply_theme(id: String) -> void:

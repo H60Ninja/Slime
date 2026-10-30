@@ -519,6 +519,25 @@ func _shape_polygon(shape: String, r: float) -> PackedVector2Array:
 			var a := TAU * i / 60.0
 			var rr := r * (0.62 + 0.38 * absf(cos(2.5 * a)))
 			pts.append(Vector2(cos(a), sin(a)) * rr)
+	elif shape == "moon":
+		# Crescent: outer circle (radius r) minus an inner circle (0.85 r) shifted right.
+		var a0 := deg_to_rad(58.0)
+		for i in 33:
+			var a := a0 + (TAU - 2.0 * a0) * i / 32.0
+			pts.append(Vector2(cos(a), sin(a)) * r)
+		var b0 := deg_to_rad(88.0)
+		for i in 25:
+			var b := (TAU - b0) - (TAU - 2.0 * b0) * i / 24.0
+			pts.append(Vector2(0.5 * r, 0.0) + Vector2(cos(b), sin(b)) * 0.85 * r)
+	elif shape == "fish":
+		# Ellipse body facing right, open at the back, with a forked tail.
+		var span := PI - 0.7
+		for i in 41:
+			var a := -span + 2.0 * span * i / 40.0
+			pts.append(Vector2(0.15 * r + 0.6 * r * cos(a), 0.42 * r * sin(a)))
+		pts.append(Vector2(-0.95 * r, 0.5 * r))
+		pts.append(Vector2(-0.68 * r, 0.0))
+		pts.append(Vector2(-0.95 * r, -0.5 * r))
 	else:
 		for i in 10:
 			var rr := r if i % 2 == 0 else r * 0.45
