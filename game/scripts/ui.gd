@@ -43,6 +43,7 @@ var _selected := 0
 var _style := 0
 var _sparkle := false
 var _spark_btn: Button
+var _stamps_btn: Button
 var _knife_btn: Button
 var _roller_btn: Button
 var _roller := false
@@ -133,10 +134,10 @@ func _ready() -> void:
 	sprinkles.add_child(_icon(Icon.BEADS))
 	sprinkles.pressed.connect(func(): sprinkles_pressed.emit())
 	row.add_child(sprinkles)
-	var stamps := _round_button(Color.WHITE)
-	stamps.add_child(_icon(Icon.STAMP_STAR))
-	stamps.pressed.connect(func(): stamps_pressed.emit())
-	row.add_child(stamps)
+	_stamps_btn = _round_button(Color.WHITE)
+	_stamps_btn.add_child(_icon(Icon.STAMP_STAR))
+	_stamps_btn.pressed.connect(func(): stamps_pressed.emit())
+	row.add_child(_stamps_btn)
 
 	row.add_child(_spacer())
 	_knife_btn = _round_button(Color.WHITE)
@@ -194,6 +195,16 @@ func set_scent(kind: String) -> void:
 func pulse_palette(on: bool) -> void:
 	_pulse_target = _buttons[_selected] if on else null
 	_pulse.visible = on
+
+
+## Pulse ring on the stamps button (tool hint for kids who only squish).
+func pulse_stamps(on: bool) -> void:
+	_pulse_target = _stamps_btn if on else null
+	_pulse.visible = on
+
+
+func stamps_button_position() -> Vector2:
+	return _stamps_btn.global_position + _stamps_btn.size * 0.5
 
 
 func _process(delta: float) -> void:

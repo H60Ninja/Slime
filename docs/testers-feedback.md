@@ -10,7 +10,7 @@ Source: `~/Desktop/Squish! Slime for Kids - Feedback Report - squish_feedback.pd
 ## Wording for the production-access form
 - Testers: a testing community (15) plus family.
 - Feedback: ran cleanly across devices and Android versions, no crashes. Suggested a keyword-richer description and rating/share prompts; the prompts were declined to keep the kids' app free of text and outbound links.
-- Changes: v1.0.1 added moon and fish stamps. v1.0.2 refreshed the listing description and screenshots to show the current tools, plus a small feel tweak.
+- Changes: v1.0.1 added moon and fish stamps. v1.0.2 added a no-text in-app cue that points kids to the stamps tool after they have squished for a while (from the report's tutorial suggestion), refreshed the listing description and screenshots to show the current tools.
 
 ## Listing description refresh (paste into Play Console with v1.0.2)
 Short (74 chars):

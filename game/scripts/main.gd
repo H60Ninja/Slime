@@ -62,6 +62,10 @@ var scents_picker: CanvasLayer
 var scents: Node2D
 var _hint: Node2D
 var _hint_t := 0.0
+var _tool_hint_t := 0.0        # countdown to the stamps-button cue
+var _tool_hinted := false      # kid has opened the stamps picker at least once (saved)
+var _tool_hint_shows := 0      # at most 2 cues per launch
+var _tool_hint_showing := false
 var store: Node
 var gate: CanvasLayer
 var sprinkles_picker: CanvasLayer
@@ -93,7 +97,7 @@ func _ready() -> void:
 	ui.themes_pressed.connect(func(): if not mixing: themes.open(); _play(_click))
 	ui.scents_pressed.connect(func(): if not mixing: scents_picker.open(scents.scent); _play(_click))
 	ui.sprinkles_pressed.connect(func(): if not mixing: sprinkles_picker.open(); _play(_click))
-	ui.stamps_pressed.connect(func(): if not mixing: stamps_picker.open(); _play(_click))
+	ui.stamps_pressed.connect(func(): if not mixing: stamps_picker.open(); _play(_click); _on_tool_used())
 	ui.glue_pressed.connect(_on_glue)
 	ui.roller_toggled.connect(_on_roller)
 	ui.undo_pressed.connect(_on_undo)
@@ -102,7 +106,7 @@ func _ready() -> void:
 	ui.jars_pressed.connect(func(): if not mixing: jars.open(); _play(_jar))
 	slime.kneading.connect(_on_kneading)
 	slime.style_changed.connect(_on_style_changed)
-	slime.touch_at.connect(func(px: Vector2): scents.puff(px, 3); _hide_hint())
+	slime.touch_at.connect(func(px: Vector2): scents.puff(px, 3); _hide_hint(); _arm_tool_hint())
 	slime.knead_at.connect(func(px: Vector2): scents.puff(px, 1))
 	slime.sliced.connect(func(): _play(_slice_crunch if slime.style == "crunchy" else _slice_wets.pick_random()))
 	slime.touched.connect(func(inside: bool): if inside: _play(_touch_sound()))
@@ -378,6 +382,7 @@ func _on_mixed(col: Color) -> void:
 ## First touch hint: a hand presses the lump, then smears it.
 func _show_hint() -> void:
 	var c: Vector2 = slime.drop_target()
+	_hint.flip = false
 	_hint.drag(c + Vector2(-120, -40), c + Vector2(140, 60))
 	_hint_t = 7.0
 
@@ -385,6 +390,29 @@ func _show_hint() -> void:
 func _hide_hint() -> void:
 	_hint_t = 0.0
 	_hint.hide_hand()
+	if _tool_hint_showing:
+		_tool_hint_showing = false
+		ui.pulse_stamps(false)
+
+
+func _any_picker_open() -> bool:
+	return jars.visible or themes.visible or scents_picker.visible or sprinkles_picker.visible or stamps_picker.visible or gate.visible
+
+
+## Second-stage hint: a kid who only squishes gets a tap cue on the stamps button
+## after ~18 s of play, at most twice per launch, never again once they have used it.
+func _arm_tool_hint() -> void:
+	if _tool_hinted or _tool_hint_shows >= 2 or _tool_hint_t > 0.0 or mixing:
+		return
+	_tool_hint_t = 18.0
+
+
+func _on_tool_used() -> void:
+	if not _tool_hinted:
+		_tool_hinted = true
+		_save()
+	_tool_hint_t = 0.0
+	_hide_hint()
 
 
 ## + gives a fresh lump straight away; the bowl button runs the ritual.
@@ -856,6 +884,7 @@ func _save() -> void:
 	cf.set_value("slime", "sparkle", slime.sparkle)
 	cf.set_value("slime", "style", slime.style)
 	cf.set_value("slime", "scent", scents.scent)
+	cf.set_value("ui", "tool_hinted", _tool_hinted)
 	cf.save(SETTINGS)
 
 
@@ -869,6 +898,7 @@ func _load() -> bool:
 	slime.style = cf.get_value("slime", "style", "shiny")
 	slime.reset()
 	scents.scent = cf.get_value("slime", "scent", "")
+	_tool_hinted = cf.get_value("ui", "tool_hinted", false)
 	ui.set_scent(scents.scent)
 	ui.set_state(slime.color, slime.style, slime.sparkle)
 	return true
@@ -878,7 +908,16 @@ func _process(delta: float) -> void:
 	if _hint_t > 0.0:
 		_hint_t -= delta
 		if _hint_t <= 0.0:
-			_hint.hide_hand()
+			_hide_hint()
+	if _tool_hint_t > 0.0:
+		_tool_hint_t -= delta
+		if _tool_hint_t <= 0.0 and not _tool_hinted and not mixing and not _any_picker_open():
+			_tool_hint_shows += 1
+			_tool_hint_showing = true
+			_hint.flip = true
+			_hint.tap_at(ui.stamps_button_position() + Vector2(0, -30))
+			ui.pulse_stamps(true)
+			_hint_t = 6.0
 	if _wet:
 		_wet.volume_db = lerpf(_wet.volume_db, _wet_target_db, minf(1.0, delta * 8.0))
 	if OS.is_debug_build():

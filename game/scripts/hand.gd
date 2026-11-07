@@ -7,6 +7,7 @@ var mode := Mode.HIDDEN
 var a := Vector2.ZERO
 var b := Vector2.ZERO
 var radius := 120.0
+var flip := false   # true: hand hangs from above and points down (for cues near the bottom edge)
 var _t := 0.0
 
 
@@ -53,7 +54,7 @@ func _draw() -> void:
 			var k := fmod(_t, 1.1) / 1.1
 			press = 1.0 - absf(k * 2.0 - 1.0)   # down then up
 			press = smoothstep(0.0, 1.0, press)
-			p = a + Vector2(0, 18) * press
+			p = a + Vector2(0, -18 if flip else 18) * press
 			if k < 0.5:
 				draw_arc(a, 40.0 + 60.0 * (1.0 - press), 0.0, TAU, 40, Color(1, 1, 1, 0.8 * (1.0 - press)), 8.0, true)
 		Mode.DRAG:
@@ -75,7 +76,7 @@ func _draw_hand(p: Vector2, press: float) -> void:
 	var skin := Color("ffd9b3")
 	var line := Color("5a3c2e")
 	var s := 1.0 - 0.08 * press
-	draw_set_transform(p, 0.0, Vector2(s, s))
+	draw_set_transform(p, 0.0, Vector2(s, -s if flip else s))
 	# shadow
 	draw_circle(Vector2(6, 46), 34, Color(0, 0, 0, 0.12))
 	# fingertip at origin; finger goes down-right into the palm
