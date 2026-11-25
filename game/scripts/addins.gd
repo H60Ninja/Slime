@@ -2,7 +2,7 @@ extends Node2D
 ## Beads and stars sprinkled onto the slime. They ride along when the slime is
 ## smeared and get pushed aside by a pressing finger.
 
-enum Kind { BEAD, STAR }
+enum Kind { BEAD, STAR, SNOW }   # values are saved in jars: only ever append
 const MAX := 70
 
 var slime: Node2D   # set by Slime
@@ -46,6 +46,8 @@ func sprinkle(kind: int, n: int) -> void:
 		var col: Color
 		if kind == Kind.BEAD:
 			col = Color.from_hsv(randf(), 0.45, 1.0)
+		elif kind == Kind.SNOW:
+			col = [Color("ffffff"), Color("cfe8ff"), Color("9fd0ff")].pick_random()
 		else:
 			col = [Color("ffd84d"), Color("ffffff"), Color("ff9ad5"), Color("7fe3ff")].pick_random()
 		_items.append({"p": c, "kind": kind, "col": col, "rot": randf() * TAU, "size": randf_range(0.85, 1.15)})
@@ -80,8 +82,11 @@ func _clamp(it: Dictionary) -> void:
 	it["p"] = Vector2(clampf(it["p"].x, 0.5, slime.GW - 1.5), clampf(it["p"].y, 0.5, slime.GH - 1.5))
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _items.is_empty():
+		for it in _items:
+			if it["kind"] == Kind.SNOW:
+				it["rot"] += delta * 0.35   # snowflakes turn slowly on their own
 		queue_redraw()
 
 
@@ -109,6 +114,8 @@ func _draw() -> void:
 			var cover := Color(slime_col.r, slime_col.g, slime_col.b, 0.4 * sink)
 			draw_circle(px + Vector2(0, rr * 0.25), rr * 1.02, cover)
 			draw_arc(px, rr * 1.02, 0.0, TAU, 24, Color(1, 1, 1, 0.25 * sink), 1.5, true)
+		elif it["kind"] == Kind.SNOW:
+			_draw_snowflake(px, 19.0 * size, it["rot"], col, slime_col, sink)
 		else:
 			var pts := PackedVector2Array()
 			for i in 10:
@@ -118,3 +125,28 @@ func _draw() -> void:
 			draw_colored_polygon(pts, col)
 			if sink > 0.0:
 				draw_colored_polygon(pts, Color(slime_col.r, slime_col.g, slime_col.b, 0.4 * sink))
+
+
+## Six-armed flake: arms with a pair of twigs each, a soft glow, sinking like the stars.
+func _draw_snowflake(px: Vector2, r: float, rot: float, col: Color, slime_col: Color, sink: float) -> void:
+	draw_circle(px, r * 0.9, Color(1, 1, 1, 0.18 * col.a))
+	var w := maxf(2.5, r * 0.2)
+	var edge := Color(0.3, 0.5, 0.8, 0.45 * col.a)   # soft outline so white flakes show on white slime
+	for i in 6:
+		var a := rot + TAU * i / 6.0
+		var dir := Vector2(cos(a), sin(a))
+		draw_line(px, px + dir * r, edge, w + 3.0, true)
+		var mid := px + dir * r * 0.55
+		draw_line(mid, mid + dir.rotated(0.7) * r * 0.38, edge, w * 0.8 + 3.0, true)
+		draw_line(mid, mid + dir.rotated(-0.7) * r * 0.38, edge, w * 0.8 + 3.0, true)
+	for i in 6:
+		var a := rot + TAU * i / 6.0
+		var dir := Vector2(cos(a), sin(a))
+		var tip := px + dir * r
+		draw_line(px, tip, col, w, true)
+		var mid := px + dir * r * 0.55
+		draw_line(mid, mid + dir.rotated(0.7) * r * 0.38, col, w * 0.8, true)
+		draw_line(mid, mid + dir.rotated(-0.7) * r * 0.38, col, w * 0.8, true)
+	draw_circle(px, w * 0.9, col)
+	if sink > 0.0:
+		draw_circle(px, r * 0.95, Color(slime_col.r, slime_col.g, slime_col.b, 0.25 * sink))

@@ -538,12 +538,54 @@ func _shape_polygon(shape: String, r: float) -> PackedVector2Array:
 		pts.append(Vector2(-0.95 * r, 0.5 * r))
 		pts.append(Vector2(-0.68 * r, 0.0))
 		pts.append(Vector2(-0.95 * r, -0.5 * r))
+	elif shape == "snowflake":
+		# Six thick arms around a round middle (twigs are too fine for the 80x52 grid).
+		for i in 120:
+			var a := -PI / 2.0 + TAU * i / 120.0
+			var arm := pow(absf(cos(3.0 * a)), 7.0)
+			pts.append(Vector2(cos(a), sin(a)) * r * (0.32 + 0.68 * arm))
+	elif shape == "snowman":
+		pts = _union([_circle_poly(Vector2(0, 0.52 * r), 0.44 * r),
+				_circle_poly(Vector2(0, -0.12 * r), 0.33 * r),
+				_circle_poly(Vector2(0, -0.62 * r), 0.25 * r)])
+	elif shape == "tree":
+		pts = _union([
+				PackedVector2Array([Vector2(0, -r), Vector2(0.42 * r, -0.36 * r), Vector2(-0.42 * r, -0.36 * r)]),
+				PackedVector2Array([Vector2(0, -0.62 * r), Vector2(0.62 * r, 0.12 * r), Vector2(-0.62 * r, 0.12 * r)]),
+				PackedVector2Array([Vector2(0, -0.22 * r), Vector2(0.82 * r, 0.6 * r), Vector2(-0.82 * r, 0.6 * r)]),
+				PackedVector2Array([Vector2(-0.16 * r, 0.5 * r), Vector2(0.16 * r, 0.5 * r), Vector2(0.16 * r, 0.95 * r), Vector2(-0.16 * r, 0.95 * r)])])
 	else:
 		for i in 10:
 			var rr := r if i % 2 == 0 else r * 0.45
 			var a := -PI / 2.0 + TAU * i / 10.0
 			pts.append(Vector2(cos(a), sin(a)) * rr)
 	return pts
+
+
+static func _circle_poly(c: Vector2, rad: float, n := 32) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in n:
+		var a := TAU * i / n
+		pts.append(c + Vector2(cos(a), sin(a)) * rad)
+	return pts
+
+
+## Outline of overlapping polygons merged into one (keeps the largest piece).
+static func _union(polys: Array) -> PackedVector2Array:
+	var acc: PackedVector2Array = polys[0]
+	for i in range(1, polys.size()):
+		var merged: Array = Geometry2D.merge_polygons(acc, polys[i])
+		var best: PackedVector2Array = acc
+		var best_area := -1.0
+		for m: PackedVector2Array in merged:   # holes always lie inside the outline, so it has the largest area
+			var area := 0.0
+			for k in m.size():
+				area += m[k].cross(m[(k + 1) % m.size()])
+			if absf(area) > best_area:
+				best_area = absf(area)
+				best = m
+		acc = best
+	return acc
 
 
 static func _poly_distance(q: Vector2, poly: PackedVector2Array) -> float:

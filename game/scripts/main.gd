@@ -28,6 +28,9 @@ const THEMES := {
 	"rainbow":  {"color": Color("ff4d4d"), "style": "magic", "sparkle": false, "drops": [Color("ffe44d"), Color("4fb8ff"), Color("6fe36a")], "beads": 0, "stars": 0, "scent": ""},
 	"lemonade": {"color": Color("ffe44d"), "style": "clear", "sparkle": false, "drops": [Color("f4f4ff")], "beads": 8, "stars": 0, "scent": "lemon"},
 	"mint":     {"color": Color("3fe0b8"), "style": "crunchy", "sparkle": false, "drops": [Color("f4f4ff")], "beads": 0, "stars": 0, "scent": "mint"},
+	# winter (v1.1.0); "snow" = snowflake add-ins, optional key so older entries need not list it
+	"snow":       {"color": Color("f2f7ff"), "style": "fluffy", "sparkle": true, "drops": [Color("bfe3ff"), Color("dfe9ff")], "beads": 0, "stars": 0, "snow": 14, "scent": ""},
+	"peppermint": {"color": Color("fbf7f7"), "style": "shiny", "sparkle": false, "drops": [Color("ff3b4e"), Color("ff3b4e"), Color("ff3b4e")], "beads": 0, "stars": 0, "snow": 0, "scent": "mint"},
 }
 
 var slime: Node2D
@@ -449,6 +452,7 @@ func _rebuild_pickers() -> void:
 	var sitems := [
 		{"id": "beads", "draw": _draw_sprinkle_tile.bind("beads")},
 		{"id": "stars", "draw": _draw_sprinkle_tile.bind("stars")},
+		{"id": "snow", "draw": _draw_sprinkle_tile.bind("snow")},
 	]
 	if store.show_premium():
 		sitems.append({"id": "rainbow", "draw": _draw_sprinkle_tile.bind("rainbow"), "locked": not store.is_unlocked()})
@@ -460,6 +464,9 @@ func _rebuild_pickers() -> void:
 		{"id": "flower", "draw": _draw_stamp_tile.bind("flower")},
 		{"id": "moon", "draw": _draw_stamp_tile.bind("moon")},
 		{"id": "fish", "draw": _draw_stamp_tile.bind("fish")},
+		{"id": "snowflake", "draw": _draw_stamp_tile.bind("snowflake")},
+		{"id": "snowman", "draw": _draw_stamp_tile.bind("snowman")},
+		{"id": "tree", "draw": _draw_stamp_tile.bind("tree")},
 	]
 	stamps_picker.set_items(stitems)
 
@@ -475,6 +482,8 @@ func _on_sprinkle(id: String) -> void:
 			slime.addins.sprinkle(0, 10)
 		"stars":
 			slime.addins.sprinkle(1, 10)
+		"snow":
+			slime.addins.sprinkle(2, 10)
 		"rainbow":
 			slime.addins.sprinkle(0, 8)
 			slime.addins.sprinkle(1, 6)
@@ -529,6 +538,9 @@ func _draw_sprinkle_tile(c: CanvasItem, r: Rect2, id: String) -> void:
 					var a := -PI / 2 + TAU * i / 10
 					pts.append(centre + q + Vector2(cos(a), sin(a)) * rr)
 				c.draw_colored_polygon(pts, [Color("ffd84d"), Color("ff9ad5"), Color("7fe3ff")][int(q.x) % 3])
+		"snow":
+			for q: Vector3 in [Vector3(-34, 24, 34), Vector3(36, -24, 28), Vector3(10, 34, 20), Vector3(-30, -34, 18)]:
+				_draw_flake_icon(c, centre + Vector2(q.x, q.y), q.z, Color("6fb6f0"))
 		"rainbow":
 			for i in 7:
 				var a := -PI / 2 + TAU * i / 7.0
@@ -569,7 +581,21 @@ func _draw_stamp_tile(c: CanvasItem, r: Rect2, shape: String) -> void:
 			for q in slime._shape_polygon(shape, 72.0):
 				pts.append(centre + q)
 	pts.append(pts[0])
-	c.draw_polyline(pts, {"star": Color("8a8fa8"), "heart": Color("ff7aa8"), "circle": Color("4fb8ff"), "flower": Color("ff9b2f"), "moon": Color("ffd34f"), "fish": Color("3fcf8e")}[shape], 12.0, true)
+	c.draw_polyline(pts, STAMP_COLORS.get(shape, Color("8a8fa8")), 12.0, true)
+
+
+const STAMP_COLORS := {"star": Color("8a8fa8"), "heart": Color("ff7aa8"), "circle": Color("4fb8ff"), "flower": Color("ff9b2f"),
+		"moon": Color("ffd34f"), "fish": Color("3fcf8e"), "snowflake": Color("6fb6f0"), "snowman": Color("8fa6c8"), "tree": Color("2fa45e")}
+
+
+func _draw_flake_icon(c: CanvasItem, p: Vector2, r: float, col: Color) -> void:
+	var w := maxf(3.0, r * 0.16)
+	for i in 6:
+		var dir := Vector2.UP.rotated(TAU * i / 6.0)
+		c.draw_line(p, p + dir * r, col, w, true)
+		var mid := p + dir * r * 0.55
+		c.draw_line(mid, mid + dir.rotated(0.7) * r * 0.36, col, w * 0.8, true)
+		c.draw_line(mid, mid + dir.rotated(-0.7) * r * 0.36, col, w * 0.8, true)
 
 
 func _apply_theme(id: String) -> void:
@@ -588,6 +614,8 @@ func _apply_theme(id: String) -> void:
 		slime.addins.sprinkle(0, t["beads"])
 	if t["stars"] > 0:
 		slime.addins.sprinkle(1, t["stars"])
+	if t.get("snow", 0) > 0:
+		slime.addins.sprinkle(2, t["snow"])
 	scents.scent = t["scent"]
 	ui.set_scent(scents.scent)
 	ui.set_state(slime.color, slime.style, slime.sparkle)
@@ -625,6 +653,9 @@ func _draw_theme_tile(c: CanvasItem, r: Rect2, id: String) -> void:
 				var ang := -PI / 2 + TAU * i / 10
 				pts.append(p + Vector2(cos(ang), sin(ang)) * rr)
 			c.draw_colored_polygon(pts, Color("ffd84d"))
+	if t.get("snow", 0) > 0:
+		for q: Vector2 in [Vector2(0.45, 0.45), Vector2(-0.55, -0.25), Vector2(0.15, -0.6)]:
+			_draw_flake_icon(c, centre + q * rad, 13.0, Color("6fb6f0"))
 	if t["scent"] != "":
 		c.draw_set_transform(r.position + Vector2(r.size.x - 34, 34), 0.0, Vector2(0.9, 0.9))
 		ScentsScript.draw_icon(c, t["scent"], 1.0)
