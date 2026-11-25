@@ -253,6 +253,7 @@ that because of the 14-day test gate.
 - Content: Snow and Peppermint themes, snowflake sprinkles, snowflake / snowman / tree stamps. All free.
 - Verified on API 36 and Fire OS 8 emulators, including in-place upgrade from v1.0.2 with a saved jar (jar, settings and theme survived).
 - Files: `build/slime-release.aab` (Google), `build/slime-release.apk` (Amazon). Screenshot `store/screenshots/11-winter.png`, Google 16:9 `store/google/10-winter.png`.
+- Google Play: production release 5 (1.1.0) + listing (winter line atop description, knife shot removed, winter shot added to phone slot only) sent for review 2026-11-24. Amazon: Adam submitting the APK himself the same day.
 - Submit to both stores by ~2026-12-05. Remove the seasonal keywords from the description in January.
 - Known, pre-existing: thick white paint shades grey in the shader (palette white does it too); themes avoid white drops for that reason.
 
