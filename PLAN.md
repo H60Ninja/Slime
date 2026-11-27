@@ -257,3 +257,9 @@ that because of the 14-day test gate.
 - Submit to both stores by ~2026-12-05. Remove the seasonal keywords from the description in January.
 - Known, pre-existing: thick white paint shades grey in the shader (palette white does it too); themes avoid white drops for that reason.
 
+
+## Monetisation setup (2026-11-27)
+- Google Play merchant account created by Adam on the personal (Individual) payments profile. Public merchant profile: name "DadBuilt Apps", a non-home mailing address, statement name "DADBUILT APPS". Category "Internet, Network and Digital Media".
+- Enrolled in the 15% service fee; account group = DadBuilt Apps only. Add the LLC's organization developer account to this group when it exists. An Individual payments profile can't be converted to a business one; the LLC will need its own.
+- Still to do: trader status declaration (by 2027-02-01; declare trader once anything is sold), Amazon Small Business Accelerator Program check, then build the paid unlock (Play Billing + Amazon IAP behind the parental gate) with the full release-safety testing.
+- Dashboard 2026-11-27 (last 28 days): 10 store acquisitions, 5 first opens, 6 monthly active devices, no ratings yet.
